@@ -72,7 +72,7 @@ def load_model(model_type):
         traceback.print_exc()
         return None
 
-def voice_clone(text, reference_audio, ref_transcript, use_fast_mode):
+def voice_clone(text, reference_audio, ref_transcript):
     """Generate speech by cloning a reference voice"""
     if not text or not reference_audio:
         return None
@@ -86,12 +86,15 @@ def voice_clone(text, reference_audio, ref_transcript, use_fast_mode):
         print(f"⏱️ Creating prompt...")
         prompt_start = time.time()
 
-        if use_fast_mode or not ref_transcript:
+        # Automatic Fast Mode: if transcript is missing, use x-vector only mode
+        if not ref_transcript or not ref_transcript.strip():
+            print("   (Using Fast Mode: No transcript provided)")
             prompt_items = model.create_voice_clone_prompt(
                 ref_audio=reference_audio,
                 x_vector_only_mode=True
             )
         else:
+            print("   (Using High Quality Mode: Transcript provided)")
             prompt_items = model.create_voice_clone_prompt(
                 ref_audio=reference_audio,
                 ref_text=ref_transcript,

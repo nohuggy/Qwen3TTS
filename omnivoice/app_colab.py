@@ -22,12 +22,11 @@ def create_app():
                     clone_text = gr.Textbox(label="Text to Synthesize", placeholder="Enter text...", lines=4)
                     clone_audio = gr.Audio(label="Reference Audio (3+ seconds)", type="filepath")
                     clone_transcript = gr.Textbox(label="Reference Transcript (Optional)", placeholder="What's said in the reference audio... Improves quality.", lines=3)
-                    clone_fast_mode = gr.Checkbox(label="Fast Mode (Ignore transcript, faster inference)", value=True)
                     clone_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
                     clone_output = gr.Audio(label="Generated Speech")
 
-            clone_btn.click(voice_clone, inputs=[clone_text, clone_audio, clone_transcript, clone_fast_mode], outputs=clone_output)
+            clone_btn.click(voice_clone, inputs=[clone_text, clone_audio, clone_transcript], outputs=clone_output)
 
         with gr.Tab("Custom Voice"):
             gr.Markdown("### Use 9 preset character voices with style control")
