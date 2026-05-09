@@ -69,6 +69,7 @@ def load_model(model_type):
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+        time.sleep(1) # Breathe
 
     # Ensure ASR and Aligner are unloaded before loading TTS
     unload_asr()
@@ -211,7 +212,11 @@ def voice_clone(text, reference_audio, ref_transcript, gen_srt=False, convert_pu
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+        
+        # Explicitly clear audio tensors to free VRAM before alignment
+        del wavs
         gc.collect()
+        time.sleep(1) # Breathe
 
         srt_content = ""
         if gen_srt:
@@ -268,7 +273,11 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+        
+        # Explicitly clear audio tensors to free VRAM before alignment
+        del wavs
         gc.collect()
+        time.sleep(1) # Breathe
 
         srt_content = ""
         if gen_srt:
@@ -318,7 +327,11 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False):
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+        
+        # Explicitly clear audio tensors to free VRAM before alignment
+        del wavs
         gc.collect()
+        time.sleep(1) # Breathe
 
         srt_content = ""
         if gen_srt:
@@ -416,6 +429,7 @@ def get_aligner_pipe():
             gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+            time.sleep(1) # Breathe
         unload_asr()
         
         try:

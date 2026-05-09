@@ -88,9 +88,23 @@ def create_app():
                         return tf.read()
 
             def on_clone(text, audio, transcript, gen_srt, conv_punc):
-                audio_path, srt = voice_clone(text, audio, transcript, gen_srt=gen_srt, convert_punc=conv_punc)
+                # Phase 1: Generate Audio
+                audio_path, _ = voice_clone(text, audio, transcript, gen_srt=False, convert_punc=conv_punc)
+                if not audio_path:
+                    yield None, "❌ Generation failed.", gr.update(visible=False)
+                    return
+                
+                # Show audio immediately
+                yield audio_path, "Audio ready. Aligning subtitles...", gr.update(visible=False)
+                
+                # Phase 2: Subtitles (Memory Intensive)
+                srt = ""
+                if gen_srt:
+                    from omnivoice.omni_engine_colab import generate_srt
+                    srt = generate_srt(text, audio_path)
+                
                 zip_path = package_zip(audio_path, srt)
-                return audio_path, srt, gr.update(value=zip_path, visible=True)
+                yield audio_path, srt, gr.update(value=zip_path, visible=True)
 
             trans_btn.click(on_transcribe, inputs=[clone_audio], outputs=[clone_transcript])
             ref_zip_btn.upload(process_ref_zip, inputs=[ref_zip_btn], outputs=[clone_audio, clone_transcript])
@@ -120,9 +134,22 @@ def create_app():
                     custom_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
 
             def on_custom(text, name, instr, gen_srt, conv_punc):
-                audio_path, srt = custom_voice(text, name, instr, gen_srt=gen_srt, convert_punc=conv_punc)
+                # Phase 1: Audio
+                audio_path, _ = custom_voice(text, name, instr, gen_srt=False, convert_punc=conv_punc)
+                if not audio_path:
+                    yield None, "❌ Generation failed.", gr.update(visible=False)
+                    return
+                
+                yield audio_path, "Audio ready. Aligning subtitles...", gr.update(visible=False)
+                
+                # Phase 2: SRT
+                srt = ""
+                if gen_srt:
+                    from omnivoice.omni_engine_colab import generate_srt
+                    srt = generate_srt(text, audio_path)
+                    
                 zip_path = package_zip(audio_path, srt)
-                return audio_path, srt, gr.update(value=zip_path, visible=True)
+                yield audio_path, srt, gr.update(value=zip_path, visible=True)
 
             custom_btn.click(on_custom, inputs=[custom_text, custom_voice_name, custom_instruction, custom_gen_srt, custom_conv_punc], outputs=[custom_output, custom_srt_preview, custom_zip_dl])
 
@@ -144,9 +171,22 @@ def create_app():
                     design_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
 
             def on_design(text, desc, gen_srt, conv_punc):
-                audio_path, srt = voice_design(text, desc, gen_srt=gen_srt, convert_punc=conv_punc)
+                # Phase 1: Audio
+                audio_path, _ = voice_design(text, desc, gen_srt=False, convert_punc=conv_punc)
+                if not audio_path:
+                    yield None, "❌ Generation failed.", gr.update(visible=False)
+                    return
+                
+                yield audio_path, "Audio ready. Aligning subtitles...", gr.update(visible=False)
+                
+                # Phase 2: SRT
+                srt = ""
+                if gen_srt:
+                    from omnivoice.omni_engine_colab import generate_srt
+                    srt = generate_srt(text, audio_path)
+                    
                 zip_path = package_zip(audio_path, srt)
-                return audio_path, srt, gr.update(value=zip_path, visible=True)
+                yield audio_path, srt, gr.update(value=zip_path, visible=True)
 
             design_btn.click(on_design, inputs=[design_text, design_description, design_gen_srt, design_conv_punc], outputs=[design_output, design_srt_preview, design_zip_dl])
 
