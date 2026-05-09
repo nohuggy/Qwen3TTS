@@ -8,6 +8,7 @@ from qwen_tts import Qwen3TTSModel
 # Global variables
 current_model = None
 current_model_type = None
+ASR_PIPE = None
 
 # Device detection
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -33,9 +34,14 @@ def load_model(model_type):
     if current_model is not None:
         print(f"Unloading {current_model_type} model...")
         del current_model
+        current_model = None
+        current_model_type = None
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+
+    # Ensure ASR is unloaded before loading TTS
+    unload_asr()
 
     print(f"Loading {model_type} model (1.7B) on {DEVICE}...")
     start = time.time()
@@ -239,3 +245,69 @@ def voice_design(text, voice_description):
     except Exception as e:
         print(f"❌ Error in voice_design: {str(e)}")
         return None
+
+def get_asr_pipe():
+    """Load Qwen3-ASR-0.6B model"""
+    global ASR_PIPE
+    if ASR_PIPE is None:
+        print("Loading Qwen3-ASR-0.6B model...")
+        # Unload TTS model first to save VRAM
+        global current_model, current_model_type
+        if current_model is not None:
+            print(f"Unloading {current_model_type} model before ASR...")
+            del current_model
+            current_model = None
+            current_model_type = None
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        
+        try:
+            from qwen_asr import Qwen3ASRModel
+            ASR_PIPE = Qwen3ASRModel.from_pretrained(
+                "Qwen/Qwen3-ASR-0.6B",
+                dtype=DTYPE,
+                device_map=DEVICE,
+                attn_implementation="sdpa" if torch.cuda.is_available() else "eager"
+            )
+            print("✅ ASR model loaded")
+        except ImportError:
+            print("⚠️ qwen-asr not installed. Attempting to use transformers pipeline as fallback...")
+            from transformers import pipeline
+            ASR_PIPE = pipeline(
+                "automatic-speech-recognition",
+                model="Qwen/Qwen3-ASR-0.6B",
+                device=DEVICE,
+                torch_dtype=DTYPE,
+                trust_remote_code=True
+            )
+            print("✅ ASR model loaded (Pipeline Fallback)")
+    return ASR_PIPE
+
+def unload_asr():
+    """Unload ASR model to save VRAM"""
+    global ASR_PIPE
+    if ASR_PIPE is not None:
+        print("🗑️ Unloading ASR Engine...")
+        del ASR_PIPE
+        ASR_PIPE = None
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+def transcribe_ref(audio_path):
+    """Transcribe reference audio using Qwen3-ASR"""
+    if not audio_path:
+        return ""
+    try:
+        model = get_asr_pipe()
+        # Handle both Qwen3ASRModel and pipeline
+        if hasattr(model, "transcribe"):
+            results = model.transcribe(audio=audio_path)
+            return results[0].text if results else ""
+        else:
+            result = model(audio_path)
+            return result.get("text", "").strip()
+    except Exception as e:
+        print(f"❌ Transcription Error: {e}")
+        return f"Error: {e}"
