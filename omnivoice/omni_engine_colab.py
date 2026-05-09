@@ -271,8 +271,8 @@ def align_robust(user_segments, aligner_tokens):
         curr += len(s_clean)
     return results
 
-def voice_clone(text, reference_audio, ref_transcript, gen_srt=False, convert_punc=False):
-    """Generate speech by cloning a reference voice"""
+def voice_clone(text, reference_audio, ref_transcript, gen_srt=False, convert_punc=False, status_callback=None):
+    """Generate speech by cloning a reference voice with chunk awareness"""
     if not text or not reference_audio:
         return None, ""
     
@@ -323,20 +323,33 @@ def voice_clone(text, reference_audio, ref_transcript, gen_srt=False, convert_pu
         gen_start = time.time()
 
         with torch.inference_mode():
-            wavs, sr = model.generate_voice_clone(
-                text=text,
-                voice_clone_prompt=prompt_items
-            )
-
-        gen_time = time.time() - gen_start
+            # Chunk text by paragraph for better UI feedback and memory management
+            paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
+            all_wavs = []
+            sr = 24000 # Default for Qwen3-TTS
+            
+            for i, p in enumerate(paragraphs):
+                if status_callback:
+                    status_callback(f"Generating chunk {i+1}/{len(paragraphs)}...")
+                print(f"   Chunk {i+1}/{len(paragraphs)}...")
+                
+                wavs, sr = model.generate_voice_clone(
+                    text=p,
+                    voice_clone_prompt=prompt_items
+                )
+                all_wavs.append(wavs[0].cpu())
+                
+            # Concatenate chunks
+            final_wav = torch.cat(all_wavs, dim=-1)
+            gen_time = time.time() - gen_start
 
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
         # Ensure audio is on CPU and in numpy format for soundfile
-        audio_data = wavs[0].cpu().numpy() if torch.is_tensor(wavs[0]) else wavs[0]
+        audio_data = final_wav.numpy()
         sf.write(temp_file.name, audio_data, sr)
 
         total_time = time.time() - total_start
-        audio_duration = len(wavs[0]) / sr
+        audio_duration = len(final_wav) / sr
         rtf = gen_time / audio_duration
 
         print(f"✅ Done! Total: {total_time:.1f}s | Gen: {gen_time:.1f}s | Audio: {audio_duration:.1f}s | RTF: {rtf:.2f}x")
@@ -345,7 +358,7 @@ def voice_clone(text, reference_audio, ref_transcript, gen_srt=False, convert_pu
             torch.cuda.empty_cache()
         
         # Explicitly clear audio tensors to free VRAM before alignment
-        del wavs
+        del all_wavs
         gc.collect()
         time.sleep(1) # Breathe
 
@@ -359,8 +372,8 @@ def voice_clone(text, reference_audio, ref_transcript, gen_srt=False, convert_pu
         print(f"❌ Error in voice_clone: {str(e)}")
         return None, ""
 
-def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=False):
-    """Generate speech using preset voices"""
+def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=False, status_callback=None):
+    """Generate speech using preset voices with chunk awareness"""
     if not text:
         return None, ""
 
@@ -377,27 +390,40 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
         gen_start = time.time()
 
         with torch.inference_mode():
-            if instruction and instruction.strip():
-                wavs, sr = model.generate_custom_voice(
-                    text=text,
-                    speaker=voice_name,
-                    instruct=instruction
-                )
-            else:
-                wavs, sr = model.generate_custom_voice(
-                    text=text,
-                    speaker=voice_name
-                )
-
-        gen_time = time.time() - gen_start
+            # Chunk text by paragraph
+            paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
+            all_wavs = []
+            sr = 24000
+            
+            for i, p in enumerate(paragraphs):
+                if status_callback:
+                    status_callback(f"Generating chunk {i+1}/{len(paragraphs)}...")
+                print(f"   Chunk {i+1}/{len(paragraphs)}...")
+                
+                if instruction and instruction.strip():
+                    wavs, sr = model.generate_custom_voice(
+                        text=p,
+                        speaker=voice_name,
+                        instruct=instruction
+                    )
+                else:
+                    wavs, sr = model.generate_custom_voice(
+                        text=p,
+                        speaker=voice_name
+                    )
+                all_wavs.append(wavs[0].cpu())
+                
+            # Concatenate chunks
+            final_wav = torch.cat(all_wavs, dim=-1)
+            gen_time = time.time() - gen_start
 
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
         # Ensure audio is on CPU and in numpy format for soundfile
-        audio_data = wavs[0].cpu().numpy() if torch.is_tensor(wavs[0]) else wavs[0]
+        audio_data = final_wav.numpy()
         sf.write(temp_file.name, audio_data, sr)
 
         total_time = time.time() - total_start
-        audio_duration = len(wavs[0]) / sr
+        audio_duration = len(final_wav) / sr
         rtf = gen_time / audio_duration
 
         print(f"✅ Done! Total: {total_time:.1f}s | Gen: {gen_time:.1f}s | Audio: {audio_duration:.1f}s | RTF: {rtf:.2f}x")
@@ -406,7 +432,7 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
             torch.cuda.empty_cache()
         
         # Explicitly clear audio tensors to free VRAM before alignment
-        del wavs
+        del all_wavs
         gc.collect()
         time.sleep(1) # Breathe
 
@@ -420,8 +446,8 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
         print(f"❌ Error in custom_voice: {str(e)}")
         return None, ""
 
-def voice_design(text, voice_description, gen_srt=False, convert_punc=False):
-    """Generate speech from text description"""
+def voice_design(text, voice_description, gen_srt=False, convert_punc=False, status_callback=None):
+    """Generate speech from text description with chunk awareness"""
     if not text or not voice_description:
         return None, ""
 
@@ -438,20 +464,31 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False):
         gen_start = time.time()
 
         with torch.inference_mode():
-            wavs, sr = model.generate_voice_design(
-                text=text,
-                instruct=voice_description
-            )
-
-        gen_time = time.time() - gen_start
+            # Chunking
+            paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
+            all_wavs = []
+            sr = 24000
+            
+            for i, p in enumerate(paragraphs):
+                if status_callback:
+                    status_callback(f"Generating chunk {i+1}/{len(paragraphs)}...")
+                print(f"   Chunk {i+1}/{len(paragraphs)}...")
+                
+                wavs, sr = model.generate_voice_design(
+                    text=p,
+                    instruct=voice_description
+                )
+                all_wavs.append(wavs[0].cpu())
+                
+            final_wav = torch.cat(all_wavs, dim=-1)
+            gen_time = time.time() - gen_start
 
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-        # Ensure audio is on CPU and in numpy format for soundfile
-        audio_data = wavs[0].cpu().numpy() if torch.is_tensor(wavs[0]) else wavs[0]
+        audio_data = final_wav.numpy()
         sf.write(temp_file.name, audio_data, sr)
 
         total_time = time.time() - total_start
-        audio_duration = len(wavs[0]) / sr
+        audio_duration = len(final_wav) / sr
         rtf = gen_time / audio_duration
 
         print(f"✅ Done! Total: {total_time:.1f}s | Gen: {gen_time:.1f}s | Audio: {audio_duration:.1f}s | RTF: {rtf:.2f}x")
@@ -459,10 +496,9 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         
-        # Explicitly clear audio tensors to free VRAM before alignment
-        del wavs
+        del all_wavs
         gc.collect()
-        time.sleep(1) # Breathe
+        time.sleep(1)
 
         srt_content = ""
         if gen_srt:

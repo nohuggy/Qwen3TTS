@@ -112,9 +112,21 @@ def create_app():
                 start_time = time.time()
                 
                 # Phase 1: Generate Audio
-                yield gr.update(), "### 🕒 Status: ⏱️ Generating audio...", gr.update(visible=False)
+                def update_status(msg):
+                    # We can't yield from inside a nested function, 
+                    # but Gradio handlers can't easily see this.
+                    # Instead, we just let the print handles the console 
+                    # and the main generator handles the yield.
+                    pass
+                
+                # Note: To actually see the chunk updates in Gradio, 
+                # we need to make the engine functions generators 
+                # or handle updates differently.
+                # For now, we'll implement a simple generator pattern 
+                # for the engine to yield status.
+                
                 tts_start = time.time()
-                audio_path, _ = voice_clone(text, audio, transcript, gen_srt=False, convert_punc=conv_punc)
+                audio_path, _ = voice_clone(text, audio, transcript, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}"))
                 tts_dur = time.time() - tts_start
                 
                 if not audio_path:
@@ -175,9 +187,8 @@ def create_app():
                 import time
                 start_time = time.time()
                 # Phase 1: Audio
-                yield gr.update(), "### 🕒 Status: ⏱️ Generating audio...", gr.update(visible=False)
                 tts_start = time.time()
-                audio_path, _ = custom_voice(text, name, instr, gen_srt=False, convert_punc=conv_punc)
+                audio_path, _ = custom_voice(text, name, instr, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}"))
                 tts_dur = time.time() - tts_start
                 
                 if not audio_path:
@@ -227,9 +238,8 @@ def create_app():
                 import time
                 start_time = time.time()
                 # Phase 1: Audio
-                yield gr.update(), "### 🕒 Status: ⏱️ Generating audio...", gr.update(visible=False)
                 tts_start = time.time()
-                audio_path, _ = voice_design(text, desc, gen_srt=False, convert_punc=conv_punc)
+                audio_path, _ = voice_design(text, desc, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}"))
                 tts_dur = time.time() - tts_start
                 
                 if not audio_path:
