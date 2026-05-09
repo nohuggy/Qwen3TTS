@@ -276,17 +276,27 @@ def align_robust(user_segments, aligner_tokens):
     return results
 
 def clean_script(text):
-    """Remove ## Name ##, [emotion], and [pause:X] for SRT generation"""
+    """Robust removal of ## Name ##, [emotion], and [pause:X] for SRT generation"""
     if not text: return ""
-    # Remove speaker headers: ## Name ##
-    text = re.sub(r"##.*?##", "", text)
-    # Remove pause tags: [pause:0.5]
-    text = re.sub(r"\[pause:\d+\.?\d*\]", "", text)
-    # Remove emotion tags: [happy], [shout], etc.
-    # We use a broad match for brackets to catch localized descriptions
-    text = re.sub(r"\[.*?\]", "", text)
-    # Cleanup whitespace
-    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    
+    # 1. Remove speaker headers: ## Name ## (DOTALL to catch multi-line if any)
+    text = re.sub(r"##.*?##", "", text, flags=re.DOTALL)
+    
+    # 2. Remove pause tags: [pause:0.5]
+    text = re.sub(r"\[pause:\d+\.?\d*\]", "", text, flags=re.DOTALL)
+    
+    # 3. Remove emotion tags: [happy], [shout], etc.
+    # Broad match for anything inside brackets, handling multi-line
+    text = re.sub(r"\[.*?\]", "", text, flags=re.DOTALL)
+    
+    # 4. Final cleanup of whitespace and empty lines
+    lines = []
+    for line in text.split('\n'):
+        # Strip and remove common punctuation that might remain at the start of a line
+        l = line.strip()
+        if l:
+            lines.append(l)
+            
     return " ".join(lines)
 
 def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False, status_callback=None):
