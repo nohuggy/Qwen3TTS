@@ -119,16 +119,21 @@ def format_timestamp(seconds):
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
 def unify_punctuation(text):
-    """Clean up and unify punctuation for better TTS processing"""
+    """Clean up and unify punctuation for better TTS processing (Original OmniVoice Rules)"""
     if not text: return ""
-    # Map common Chinese punctuation to English for better processing if needed, 
-    # or just ensure consistent spacing.
+    import re
+    # Ellipsis: Convert ..., ⋯⋯, 。。。 to standard ……
+    text = re.sub(r'(\.\.\.+|…+|⋯+|。。。+)', '……', text)
+    # Title Marks: Convert 〈 〉, 『 』, 「 」 to standard 《 》 or 〈 〉
+    text = text.replace('『', '「').replace('』', '」') 
+    # Quotation marks: Inner 『 』 -> ‘ ’ , Outer 「 」 -> “ ”
+    text = text.replace('「', '“').replace('」', '”')
+    text = text.replace('『', '‘').replace('』', '’')
+    
+    # Also include the basic full-width mappings for safety
     replacements = {
         '，': ',', '。': '.', '！': '!', '？': '?', 
-        '；': ';', '：': ':', '“': '"', '”': '"',
-        '‘': "'", '’': "'", '（': '(', '）': ')',
-        '……': '...', '······': '...',
-        '——': '-'
+        '；': ';', '：': ':', '（': '(', '）': ')'
     }
     for old, new in replacements.items():
         text = text.replace(old, new)
