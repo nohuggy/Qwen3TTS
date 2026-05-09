@@ -680,6 +680,8 @@ def unload_aligner():
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
+import concurrent.futures
+
 def generate_srt(text, audio_path, total_start_time=None):
     """Generate SRT subtitles using Forced Aligner and Robust Splitter (Generator)"""
     if not text or not audio_path:
@@ -692,7 +694,16 @@ def generate_srt(text, audio_path, total_start_time=None):
             return m
 
         yield get_msg("Loading Aligner Engine...")
-        model = get_aligner_pipe()
+        def run_load():
+            return get_aligner_pipe()
+            
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_load)
+            while not future.done():
+                yield get_msg("Loading Aligner Engine...")
+                time.sleep(1)
+            model = future.result()
+            
         yield get_msg("✅ Engine loaded. Starting alignment...")
         if model is None: 
             yield "❌ Aligner Engine failed to load."
@@ -702,12 +713,20 @@ def generate_srt(text, audio_path, total_start_time=None):
         # Step 1: Split original text into balanced segments
         user_segments = smart_balanced_split(text)
         
-        # Step 2: Get word-level alignment from model
-        results = model.transcribe(
-            audio=audio_path,
-            context=text,
-            return_time_stamps=True
-        )
+        # Step 2: Get word-level alignment from model (Threaded to keep UI timer alive)
+        def run_transcribe():
+            return model.transcribe(
+                audio=audio_path,
+                context=text,
+                return_time_stamps=True
+            )
+            
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_transcribe)
+            while not future.done():
+                yield get_msg("🔍 Aligning subtitles...")
+                time.sleep(1)
+            results = future.result()
         
         if not results or not results[0].time_stamps:
             print("⚠️ No timestamps generated.")
