@@ -110,9 +110,11 @@ def load_model(model_type):
         return current_model
 
     except Exception as e:
-        print(f"❌ Error: {str(e)}")
+        msg = f"❌ Error loading model: {str(e)}"
+        print(msg)
         import traceback
         traceback.print_exc()
+        yield msg
         return None
 
 def format_timestamp(seconds):
@@ -293,7 +295,8 @@ def voice_clone(text, reference_audio, ref_transcript, gen_srt=False, convert_pu
                 model = status
         
         if model is None:
-            return None
+            yield "❌ Model loading failed. Check console for details."
+            return
 
         yield "Creating prompt..."
         if status_callback: status_callback("Creating prompt...")
@@ -403,7 +406,8 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
                 model = status
         
         if model is None:
-            return None
+            yield "❌ Model loading failed. Check console for details."
+            return
 
         yield f"Generating with voice: {voice_name}..."
         gen_start = time.time()
@@ -487,7 +491,8 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False, sta
                 model = status
         
         if model is None:
-            return None
+            yield "❌ Model loading failed. Check console for details."
+            return
 
         yield "Generating voice design..."
         gen_start = time.time()
