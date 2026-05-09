@@ -275,15 +275,13 @@ def align_robust(user_segments, aligner_tokens):
         curr += len(s_clean)
     return results
 
-def voice_clone(text, reference_audio, ref_transcript, gen_srt=False, convert_punc=False, status_callback=None):
-    """Generate speech by cloning a reference voice with chunk awareness"""
-    if not text or not reference_audio:
+def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False, status_callback=None):
+    """Generate speech using a Role Bank and script tags (## Name ##, [pause], [emotion])"""
+    if not text or not role_bank_data:
         return None, ""
     
     if convert_punc:
         text = unify_punctuation(text)
-        if ref_transcript:
-            ref_transcript = unify_punctuation(ref_transcript)
 
     try:
         total_start = time.time()
@@ -300,96 +298,143 @@ def voice_clone(text, reference_audio, ref_transcript, gen_srt=False, convert_pu
             yield "❌ Model loading failed. Check console for details."
             return
 
-        yield "Creating prompt..."
-        if status_callback: status_callback("Creating prompt...")
-        prompt_start = time.time()
-
-        # Logic: Prioritize high-quality cloning.
-        # If ref_transcript is provided, use it.
-        # If empty, attempt to use the model's internal ASR (x_vector_only_mode=False).
-        if ref_transcript and ref_transcript.strip():
-            print("   Mode: High-Quality (using manual transcript)")
-            prompt_items = model.create_voice_clone_prompt(
-                ref_audio=reference_audio,
-                ref_text=ref_transcript,
-                x_vector_only_mode=False
-            )
-        else:
-            print("   Mode: High-Quality (attempting Auto-ASR)...")
-            try:
-                # In the official workflow, omitting ref_text with x_vector_only_mode=False 
-                # should trigger internal ASR for alignment.
-                prompt_items = model.create_voice_clone_prompt(
-                    ref_audio=reference_audio,
-                    x_vector_only_mode=False
-                )
-            except Exception as e:
-                print(f"   ⚠️ Auto-ASR failed: {str(e)}. Falling back to Standard Mode.")
-                prompt_items = model.create_voice_clone_prompt(
-                    ref_audio=reference_audio,
-                    x_vector_only_mode=True
-                )
-
-        prompt_time = time.time() - prompt_start
-        print(f"   Prompt: {prompt_time:.1f}s")
-
-        print(f"⏱️ Generating audio...")
-        gen_start = time.time()
-
-        with torch.inference_mode():
-            # Chunk text by paragraph for better UI feedback and memory management
-            paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
-            all_wavs = []
-            sr = 24000 # Default for Qwen3-TTS
+        # Phase 1: Build Role Prompts
+        role_prompts = {}
+        first_prompt = None
+        
+        for role in role_bank_data:
+            name = role.get('name', '').strip()
+            audio = role.get('audio')
+            ref_text = role.get('text', '').strip()
             
-            for i, p in enumerate(paragraphs):
-                msg = f"Generating chunk {i+1}/{len(paragraphs)}..."
+            if not audio: continue
+            
+            msg = f"Creating prompt for {name if name else 'Default'}..."
+            if status_callback: status_callback(msg)
+            yield msg
+            
+            if ref_text:
+                prompt = model.create_voice_clone_prompt(ref_audio=audio, ref_text=ref_text, x_vector_only_mode=False)
+            else:
+                try:
+                    prompt = model.create_voice_clone_prompt(ref_audio=audio, x_vector_only_mode=False)
+                except:
+                    prompt = model.create_voice_clone_prompt(ref_audio=audio, x_vector_only_mode=True)
+            
+            if name:
+                role_prompts[name] = prompt
+            if first_prompt is None:
+                first_prompt = prompt
+
+        if not first_prompt:
+            yield "❌ No valid reference audio found."
+            return
+
+        # Phase 2: Parse Script and Generate
+        # Pattern: ## Name ## Text
+        segments = re.findall(r"##\s*(.*?)\s*##\s*(.*?)(?=##|$)", text, re.DOTALL)
+        
+        gen_start = time.time()
+        all_wavs = []
+        sr = 24000
+        
+        def process_text_part(part_text, current_prompt, current_instruction):
+            """Helper to process a text segment with potential pauses"""
+            part_wavs = []
+            # Split by [pause:X]
+            sub_parts = re.split(r"\[pause:(\d+\.?\d*)\]", part_text)
+            for i, sub in enumerate(sub_parts):
+                if i % 2 == 0: # Text
+                    if sub.strip():
+                        # We use generate_voice_clone. 
+                        # Note: Qwen3-TTS usually takes 'instruct' in generate_voice_clone if supported, 
+                        # otherwise we can prefix it to text or use the dedicated variant if needed.
+                        # For base model cloning, 'instruct' is supported in recent versions.
+                        w, _ = model.generate_voice_clone(
+                            text=sub.strip(),
+                            voice_clone_prompt=current_prompt,
+                            instruct=current_instruction if current_instruction != "Standard" else None
+                        )
+                        wav = w[0]
+                        if hasattr(wav, 'cpu'): wav = wav.cpu()
+                        if not isinstance(wav, torch.Tensor): wav = torch.from_numpy(wav)
+                        part_wavs.append(wav)
+                else: # Pause
+                    silence_sec = float(sub)
+                    silence = torch.zeros(int(sr * silence_sec))
+                    part_wavs.append(silence)
+            return part_wavs
+
+        if not segments:
+            # Mono Mode
+            print("Mode: Mono-character")
+            all_wavs.extend(process_text_part(text, first_prompt, "Standard"))
+        else:
+            # Multi Mode
+            print(f"Mode: Multi-speaker ({len(segments)} segments)")
+            for i, (speaker, raw_content) in enumerate(segments):
+                name = speaker.strip()
+                content = raw_content.strip()
+                prompt = role_prompts.get(name, first_prompt)
+                
+                # Extract Emotion [tag]
+                emotion_match = re.match(r"^\s*\[(.*?)\]\s*(.*)", content, re.DOTALL)
+                if emotion_match:
+                    instr = emotion_match.group(1)
+                    actual_text = emotion_match.group(2)
+                else:
+                    instr = "Standard"
+                    actual_text = content
+                
+                msg = f"Generating {name if name else 'Voice'} [{instr}]..."
                 if status_callback: status_callback(msg)
                 yield msg
-                print(f"   {msg}")
                 
-                wavs, sr = model.generate_voice_clone(
-                    text=p,
-                    voice_clone_prompt=prompt_items
-                )
-                wav = wavs[0]
-                if hasattr(wav, 'cpu'):
-                    wav = wav.cpu()
-                if not isinstance(wav, torch.Tensor):
-                    wav = torch.from_numpy(wav)
-                all_wavs.append(wav)
+                all_wavs.extend(process_text_part(actual_text, prompt, instr))
                 
-            # Concatenate chunks
-            final_wav = torch.cat(all_wavs, dim=-1)
-            gen_time = time.time() - gen_start
+                # Small gap between speakers if not the last one
+                if i < len(segments) - 1:
+                    all_wavs.append(torch.zeros(int(sr * 0.3)))
 
+        if not all_wavs:
+            yield "❌ No audio generated."
+            return
+
+        final_wav = torch.cat(all_wavs, dim=-1)
+        gen_time = time.time() - gen_start
+
+        # Save and Cleanup
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-        # Ensure audio is on CPU and in numpy format for soundfile
         audio_data = final_wav.numpy()
         sf.write(temp_file.name, audio_data, sr)
 
         total_time = time.time() - total_start
         audio_duration = len(final_wav) / sr
-        rtf = gen_time / audio_duration
+        
+        # Word count logic from previous task
+        # ... (Already handled in app_colab.py)
 
-        print(f"✅ Done! Total: {total_time:.1f}s | Gen: {gen_time:.1f}s | Audio: {audio_duration:.1f}s | RTF: {rtf:.2f}x")
+        print(f"✅ Done! Total: {total_time:.1f}s | Gen: {gen_time:.1f}s | Audio: {audio_duration:.1f}s")
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         
-        # Explicitly clear audio tensors to free VRAM before alignment
         del all_wavs
         gc.collect()
-        time.sleep(1) # Breathe
+        time.sleep(0.5)
 
         srt_content = ""
         if gen_srt:
-            srt_content = generate_srt(text, temp_file.name)
+            # For simplicity in multi-speaker mode, we use the raw text for alignment
+            # Or we could pass the cleaned content. For now, pass original.
+            srt_content = yield from generate_srt(text, temp_file.name, total_start_time=total_start)
 
         yield (temp_file.name, srt_content)
 
     except Exception as e:
         msg = f"❌ Error in voice_clone: {str(e)}"
+        import traceback
+        traceback.print_exc()
         print(msg)
         yield msg
 

@@ -59,88 +59,62 @@ def create_app():
         gr.Markdown("# 🎙️ Qwen3-TTS")
         gr.Markdown("Advanced Text-to-Speech AI | Voice Cloning, Custom Voice & Voice Design")
 
-        with gr.Tab("Voice Cloning"):
-            gr.Markdown("### Clone any voice with 3+ seconds of audio")
+        with gr.Tab("Voice Cloning (Multi-Speaker)"):
             with gr.Row():
-                with gr.Column():
-                    clone_text = gr.Textbox(label="Text to Synthesize", placeholder="Enter text...", lines=4)
-                    clone_audio = gr.Audio(label="Reference Audio (3+ seconds)", type="filepath")
-                    clone_transcript = gr.Textbox(label="Reference Transcript (Optional)", placeholder="What's said in the reference audio... Highly recommended for best quality.", lines=3)
+                with gr.Column(scale=1):
+                    gr.Markdown("### 🎭 Role Bank")
+                    with gr.Group():
+                        gr.Markdown("#### Role 1 (Primary)")
+                        r1_name = gr.Textbox(label="Role Name", placeholder="e.g. Alex", value="")
+                        r1_audio = gr.Audio(label="Reference Audio", type="filepath")
+                        r1_text = gr.Textbox(label="Reference Transcript", placeholder="Text from the audio...")
                     
-                    with gr.Row():
-                        trans_btn = gr.Button("Trans Ref", variant="secondary")
-                        ref_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="secondary")
-                        ref_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="secondary")
+                    with gr.Accordion("🎭 Role 2", open=False):
+                        r2_name = gr.Textbox(label="Role Name", placeholder="e.g. Sara")
+                        r2_audio = gr.Audio(label="Reference Audio", type="filepath")
+                        r2_text = gr.Textbox(label="Reference Transcript", placeholder="Text from the audio...")
                         
-                    with gr.Accordion("Advanced Settings", open=False):
-                        clone_gen_srt = gr.Checkbox(label="Generate Subtitles", value=True)
-                        clone_conv_punc = gr.Checkbox(label="Convert Punctuation", value=True)
+                    with gr.Accordion("🎭 Role 3", open=False):
+                        r3_name = gr.Textbox(label="Role Name", placeholder="e.g. Bob")
+                        r3_audio = gr.Audio(label="Reference Audio", type="filepath")
+                        r3_text = gr.Textbox(label="Reference Transcript", placeholder="Text from the audio...")
 
-                    clone_btn = gr.Button("Generate Speech", variant="primary", size="lg")
-                with gr.Column():
-                    clone_output = gr.Audio(label="Generated Speech")
-                    with gr.Group():
-                        clone_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                with gr.Column(scale=1):
+                    gr.Markdown("### 📜 Script")
+                    input_text = gr.Textbox(
+                        label="Input Text", 
+                        placeholder="## Alex ## [shout] Hello! [pause:0.5] How are you?\n## Sara ## [happy] I'm fine!", 
+                        lines=15
+                    )
+                    with gr.Row():
+                        gen_srt = gr.Checkbox(label="Generate Subtitles", value=True)
+                        conv_punc = gr.Checkbox(label="Smart Punctuation", value=True)
+                    btn = gr.Button("🚀 Generate Audio", variant="primary")
+                    audio_out = gr.Audio(label="Generated Speech")
+                    srt_out = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    status_out = gr.Textbox(label="Status", value="", interactive=False, lines=2)
+                    zip_out = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
 
-                    with gr.Group():
-                        clone_status = gr.Textbox(label="Status", value="", interactive=False, lines=2)
-                    clone_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
-
-            # Transcription handler
-            def on_transcribe(audio):
-                if not audio: return ""
-                return transcribe_ref(audio)
-
-            def process_ref_zip(zip_file):
-                if not zip_file: return None, ""
-                import zipfile, tempfile
-                audio_path = None
-                text_content = ""
-                tmp = tempfile.mkdtemp()
-                with zipfile.ZipFile(zip_file.name, 'r') as z:
-                    z.extractall(tmp)
-                    for f in z.namelist():
-                        if f.endswith(('.wav', '.mp3', '.flac')) and not f.startswith('__MACOSX') and not os.path.basename(f).startswith('.'):
-                            audio_path = os.path.join(tmp, f)
-                        if f.endswith('.txt') and not f.startswith('__MACOSX') and not os.path.basename(f).startswith('.'):
-                            txt_path = os.path.join(tmp, f)
-                            try:
-                                with open(txt_path, 'r', encoding='utf-8') as tf:
-                                    text_content = tf.read()
-                            except UnicodeDecodeError:
-                                with open(txt_path, 'r', encoding='gbk') as tf:
-                                    text_content = tf.read()
-                return audio_path, text_content
-
-            def process_ref_txt(txt_file):
-                if not txt_file: return ""
-                try:
-                    with open(txt_file.name, 'r', encoding='utf-8') as tf:
-                        return tf.read()
-                except UnicodeDecodeError:
-                    with open(txt_file.name, 'r', encoding='gbk') as tf:
-                        return tf.read()
-
-            def on_clone(text, audio, transcript, gen_srt, conv_punc):
+            def on_clone(text, 
+                         name1, audio1, text1, 
+                         name2, audio2, text2, 
+                         name3, audio3, text3, 
+                         gen_srt, conv_punc):
                 import time
                 start_time = time.time()
-                
-                # Phase 1: Generate Audio
-                def update_status(msg):
-                    # We can't yield from inside a nested function, 
-                    # but Gradio handlers can't easily see this.
-                    # Instead, we just let the print handles the console 
-                    # and the main generator handles the yield.
-                    pass
-                
-                # Note: To actually see the chunk updates in Gradio, 
                 # Clear previous outputs immediately
                 yield None, "", gr.update(visible=False), "⏳ Initializing..."
+                
+                # Build role bank data
+                role_bank_data = []
+                if audio1: role_bank_data.append({'name': name1, 'audio': audio1, 'text': text1})
+                if audio2: role_bank_data.append({'name': name2, 'audio': audio2, 'text': text2})
+                if audio3: role_bank_data.append({'name': name3, 'audio': audio3, 'text': text3})
                 
                 tts_start = time.time()
                 audio_path = None
                 last_status = ""
-                for status in voice_clone(text, audio, transcript, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}")):
+                for status in voice_clone(text, role_bank_data, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}")):
                     if isinstance(status, str):
                         last_status = status
                         yield None, "", gr.update(visible=False), status
@@ -177,11 +151,11 @@ def create_app():
                 zip_path = package_zip(text, audio_path, srt)
                 yield audio_path, srt, gr.update(value=zip_path, visible=True), perf_msg
 
-            trans_btn.click(on_transcribe, inputs=[clone_audio], outputs=[clone_transcript])
-            ref_zip_btn.upload(process_ref_zip, inputs=[ref_zip_btn], outputs=[clone_audio, clone_transcript])
-            ref_txt_btn.upload(process_ref_txt, inputs=[ref_txt_btn], outputs=[clone_transcript])
-
-            clone_btn.click(on_clone, inputs=[clone_text, clone_audio, clone_transcript, clone_gen_srt, clone_conv_punc], outputs=[clone_output, clone_srt_preview, clone_zip_dl, clone_status])
+            btn.click(
+                on_clone,
+                inputs=[input_text, r1_name, r1_audio, r1_text, r2_name, r2_audio, r2_text, r3_name, r3_audio, r3_text, gen_srt, conv_punc],
+                outputs=[audio_out, srt_out, zip_out, status_out]
+            )
 
         with gr.Tab("Custom Voice"):
             gr.Markdown("### Use 9 preset character voices with style control")
