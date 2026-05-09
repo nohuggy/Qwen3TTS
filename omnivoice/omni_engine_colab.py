@@ -64,7 +64,8 @@ def load_model(model_type):
     
     if current_model_type == model_type:
         yield f"Using cached {model_type} model"
-        return current_model
+        yield current_model
+        return
 
     if current_model is not None:
         yield f"Unloading {current_model_type} model..."
@@ -107,7 +108,8 @@ def load_model(model_type):
         else:
             print(f"✅ Loaded in {load_time:.1f}s")
 
-        return current_model
+        yield current_model
+        return
 
     except Exception as e:
         msg = f"❌ Error loading model: {str(e)}"
