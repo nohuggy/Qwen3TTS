@@ -275,6 +275,20 @@ def align_robust(user_segments, aligner_tokens):
         curr += len(s_clean)
     return results
 
+def clean_script(text):
+    """Remove ## Name ##, [emotion], and [pause:X] for SRT generation"""
+    if not text: return ""
+    # Remove speaker headers: ## Name ##
+    text = re.sub(r"##.*?##", "", text)
+    # Remove pause tags: [pause:0.5]
+    text = re.sub(r"\[pause:\d+\.?\d*\]", "", text)
+    # Remove emotion tags: [happy], [shout], etc.
+    # We use a broad match for brackets to catch localized descriptions
+    text = re.sub(r"\[.*?\]", "", text)
+    # Cleanup whitespace
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    return " ".join(lines)
+
 def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False, status_callback=None):
     """Generate speech using a Role Bank and script tags (## Name ##, [pause], [emotion])"""
     if not text or not role_bank_data:
@@ -386,7 +400,7 @@ def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False, status_
                     instr = "Standard"
                     actual_text = content
                 
-                msg = f"Generating {name if name else 'Voice'} [{instr}]..."
+                msg = f"Generating chunk {i+1}/{len(segments)}..."
                 if status_callback: status_callback(msg)
                 yield msg
                 
@@ -425,9 +439,9 @@ def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False, status_
 
         srt_content = ""
         if gen_srt:
-            # For simplicity in multi-speaker mode, we use the raw text for alignment
-            # Or we could pass the cleaned content. For now, pass original.
-            srt_content = yield from generate_srt(text, temp_file.name, total_start_time=total_start)
+            # Clean text for SRT generation (filter out names, emotions, pauses)
+            clean_text = clean_script(text)
+            srt_content = yield from generate_srt(clean_text, temp_file.name, total_start_time=total_start)
 
         yield (temp_file.name, srt_content)
 
