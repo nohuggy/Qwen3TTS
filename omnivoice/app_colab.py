@@ -137,7 +137,7 @@ def create_app():
                 tts_dur = time.time() - tts_start
                 
                 if not audio_path:
-                    yield None, "❌ Generation failed.", gr.update(visible=False)
+                    yield None, gr.update(), gr.update(visible=False), "❌ Generation failed."
                     return
                 
                 # Show audio immediately
@@ -208,7 +208,7 @@ def create_app():
                 tts_dur = time.time() - tts_start
                 
                 if not audio_path:
-                    yield None, "❌ Generation failed.", gr.update(visible=False)
+                    yield None, gr.update(), gr.update(visible=False), "❌ Generation failed."
                     return
                 
                 yield audio_path, gr.update(), gr.update(visible=False), "⏳ Audio ready. Aligning subtitles..."
@@ -268,7 +268,7 @@ def create_app():
                 tts_dur = time.time() - tts_start
                 
                 if not audio_path:
-                    yield None, "❌ Generation failed.", gr.update(visible=False)
+                    yield None, gr.update(), gr.update(visible=False), "❌ Generation failed."
                     return
                 
                 yield audio_path, gr.update(), gr.update(visible=False), "⏳ Audio ready. Aligning subtitles..."
