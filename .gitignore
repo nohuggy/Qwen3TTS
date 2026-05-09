@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+.env
+
+# Models and Large Files
+*.bin
+*.pt
+*.pth
+*.safetensors
+*.ckpt
+*.onnx
+models/
+weights/
+checkpoints/
+
+# OS
+.DS_Store
+
+# Data
+data/
+outputs/
+temp/
+*.wav
+*.mp3
+*.m4a

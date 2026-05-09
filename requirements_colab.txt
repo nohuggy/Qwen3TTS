@@ -1,0 +1,8 @@
+torch>=2.4.0
+torchaudio
+gradio
+huggingface_hub
+qwen-tts
+accelerate
+soundfile
+flash-attn --no-build-isolation
