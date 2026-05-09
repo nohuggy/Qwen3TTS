@@ -352,7 +352,12 @@ def voice_clone(text, reference_audio, ref_transcript, gen_srt=False, convert_pu
                     text=p,
                     voice_clone_prompt=prompt_items
                 )
-                all_wavs.append(wavs[0].cpu())
+                wav = wavs[0]
+                if hasattr(wav, 'cpu'):
+                    wav = wav.cpu()
+                if not isinstance(wav, torch.Tensor):
+                    wav = torch.from_numpy(wav)
+                all_wavs.append(wav)
                 
             # Concatenate chunks
             final_wav = torch.cat(all_wavs, dim=-1)
@@ -437,7 +442,12 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
                         text=p,
                         speaker=voice_name
                     )
-                all_wavs.append(wavs[0].cpu())
+                wav = wavs[0]
+                if hasattr(wav, 'cpu'):
+                    wav = wav.cpu()
+                if not isinstance(wav, torch.Tensor):
+                    wav = torch.from_numpy(wav)
+                all_wavs.append(wav)
                 
             # Concatenate chunks
             final_wav = torch.cat(all_wavs, dim=-1)
@@ -515,7 +525,12 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False, sta
                     text=p,
                     instruct=voice_description
                 )
-                all_wavs.append(wavs[0].cpu())
+                wav = wavs[0]
+                if hasattr(wav, 'cpu'):
+                    wav = wav.cpu()
+                if not isinstance(wav, torch.Tensor):
+                    wav = torch.from_numpy(wav)
+                all_wavs.append(wav)
                 
             final_wav = torch.cat(all_wavs, dim=-1)
             gen_time = time.time() - gen_start
