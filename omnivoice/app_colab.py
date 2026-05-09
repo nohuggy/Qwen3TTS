@@ -25,10 +25,6 @@ def create_app():
                     clone_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
                     clone_output = gr.Audio(label="Generated Speech")
-                    gr.Markdown("""
-                    **Note**: For best results, provide the **Reference Transcript**. 
-                    If left empty, the model will fallback to a faster but lower-quality cloning method.
-                    """)
 
             clone_btn.click(voice_clone, inputs=[clone_text, clone_audio, clone_transcript], outputs=clone_output)
 
