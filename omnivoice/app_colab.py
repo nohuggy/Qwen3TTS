@@ -13,6 +13,7 @@ def count_words(text):
     latin_words = len(re.findall(r"[a-zA-Z0-9\']+", text))
     return cjk_count + latin_words
 
+# Minimal CSS
 custom_css = """
 .gr-button-primary {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
@@ -23,6 +24,13 @@ custom_css = """
     color: #a0aec0;
     margin-bottom: 8px;
     font-family: monospace;
+}
+.panel-spacer {
+    margin-top: 10px !important;
+}
+.inline-button {
+    min-width: 80px !important;
+    flex: 0 0 auto !important;
 }
 """
 
@@ -65,6 +73,7 @@ def _adv_accordion():
 
 def create_app():
     with gr.Blocks(title="Qwen3-TTS", css=custom_css) as demo:
+        # Main Title
         gr.Markdown("# Qwen3-TTS")
         gr.Markdown("Advanced Text-to-Speech AI | Voice Cloning, Custom Voice & Voice Design")
 
@@ -103,8 +112,9 @@ def create_app():
                 with open(txt_file.name, 'r', encoding='gbk') as tf: return tf.read()
 
         def auto_name_from_file(f):
-            if f: return os.path.splitext(os.path.basename(f))[0]
-            return gr.update()
+            if f: 
+                return os.path.splitext(os.path.basename(f))[0], gr.update(visible=False)
+            return gr.update(), gr.update()
 
         # ── VOICE CLONING TAB ──────────────────────────────────────────────────
         with gr.Tab("Voice Cloning"):
@@ -166,12 +176,12 @@ def create_app():
 
                     def _role_panel(label, open_=True, name_ph="e.g. Alex"):
                         with gr.Accordion(label, open=open_):
-                            with gr.Row():
-                                rname = gr.Textbox(label="Role Name", placeholder=name_ph, value="", scale=1)
+                            with gr.Row(variant="compact"):
+                                rname = gr.Textbox(label="Role Name", placeholder=name_ph, value="", scale=4)
                                 rload = gr.UploadButton("Load Role", file_types=[".qwen3tts"],
-                                                        variant="secondary", size="sm", min_width=120, scale=0)
+                                                        variant="secondary", size="sm", scale=1, elem_classes="inline-button")
                             
-                            with gr.Column() as ref_col:
+                            with gr.Column(visible=True) as extra_fields:
                                 raudio = gr.Audio(label="Reference Audio", type="filepath")
                                 rtext  = gr.Textbox(label="Reference Transcript", placeholder="Text from the audio...")
                                 with gr.Row():
@@ -180,39 +190,36 @@ def create_app():
                                     rtxt   = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="primary", size="sm")
                             
                             rclear = gr.Button("Clear", variant="secondary", size="sm")
-                        return rname, rload, raudio, rtext, rtrans, rzip, rtxt, rclear, ref_col
+                        return rname, rload, raudio, rtext, rtrans, rzip, rtxt, rclear, extra_fields
 
-                    r1_name, r1_load, r1_audio, r1_text, r1_trans, r1_zip, r1_txt, r1_clear, r1_col = \
+                    r1_name, r1_load, r1_audio, r1_text, r1_trans, r1_zip, r1_txt, r1_clear, r1_extra = \
                         _role_panel("Role 1 (Primary)", open_=True, name_ph="e.g. Alex")
-                    r2_name, r2_load, r2_audio, r2_text, r2_trans, r2_zip, r2_txt, r2_clear, r2_col = \
+                    r2_name, r2_load, r2_audio, r2_text, r2_trans, r2_zip, r2_txt, r2_clear, r2_extra = \
                         _role_panel("Role 2", open_=False, name_ph="e.g. Sara")
-                    r3_name, r3_load, r3_audio, r3_text, r3_trans, r3_zip, r3_txt, r3_clear, r3_col = \
+                    r3_name, r3_load, r3_audio, r3_text, r3_trans, r3_zip, r3_txt, r3_clear, r3_extra = \
                         _role_panel("Role 3", open_=False, name_ph="e.g. Bob")
 
                 with gr.Column():
                     audio_out  = gr.Audio(label="Generated Speech")
-                    gr.HTML("<div style='height: 20px;'></div>")
-                    srt_out    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    gr.HTML("<div style='height: 20px;'></div>")
-                    status_out = gr.Textbox(label="Status", value="", interactive=False, lines=2)
-                    
+                    with gr.Group():
+                        srt_out    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    with gr.Group(elem_classes="panel-spacer"):
+                        status_out = gr.Textbox(label="Status", value="", interactive=False, lines=2)
                     temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc = _adv_accordion()
                     btn     = gr.Button("Generate Audio", variant="primary", size="lg")
                     zip_out = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
             # Role callbacks
-            for rname, rload, raudio, rtext, rtrans, rzip, rtxt, rclear, rcol in [
-                (r1_name, r1_load, r1_audio, r1_text, r1_trans, r1_zip, r1_txt, r1_clear, r1_col),
-                (r2_name, r2_load, r2_audio, r2_text, r2_trans, r2_zip, r2_txt, r2_clear, r2_col),
-                (r3_name, r3_load, r3_audio, r3_text, r3_trans, r3_zip, r3_txt, r3_clear, r3_col),
+            for rname, rload, raudio, rtext, rtrans, rzip, rtxt, rclear, rextra in [
+                (r1_name, r1_load, r1_audio, r1_text, r1_trans, r1_zip, r1_txt, r1_clear, r1_extra),
+                (r2_name, r2_load, r2_audio, r2_text, r2_trans, r2_zip, r2_txt, r2_clear, r2_extra),
+                (r3_name, r3_load, r3_audio, r3_text, r3_trans, r3_zip, r3_txt, r3_clear, r3_extra),
             ]:
                 rtrans.click(on_transcribe, inputs=[raudio], outputs=[rtext])
                 rzip.upload(process_ref_zip, inputs=[rzip], outputs=[raudio, rtext])
                 rtxt.upload(process_ref_txt, inputs=[rtxt], outputs=[rtext])
-                # On load: hide the reference components, keep Role Name and Clear button visible
-                rload.upload(lambda f: (auto_name_from_file(f), gr.update(visible=False)), inputs=[rload], outputs=[rname, rcol])
-                # On clear: reset values and show the reference components again
-                rclear.click(lambda: (None, None, "", gr.update(visible=True)), outputs=[rname, raudio, rtext, rcol])
+                rclear.click(lambda: (None, None, "", gr.update(visible=True)), outputs=[rname, raudio, rtext, rextra])
+                rload.upload(auto_name_from_file, inputs=[rload], outputs=[rname, rextra])
 
             btn.click(
                 on_clone,
@@ -240,11 +247,10 @@ def create_app():
                     custom_btn = gr.Button("Generate Audio", variant="primary", size="lg")
                 with gr.Column():
                     custom_audio  = gr.Audio(label="Generated Speech")
-                    gr.HTML("<div style='height: 20px;'></div>")
-                    custom_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    gr.HTML("<div style='height: 20px;'></div>")
-                    custom_status = gr.Textbox(label="Status", interactive=False, lines=2)
-                    
+                    with gr.Group():
+                        custom_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    with gr.Group(elem_classes="panel-spacer"):
+                        custom_status = gr.Textbox(label="Status", interactive=False, lines=2)
                     custom_zip    = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
             def on_custom(text, name, instr, temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc):
@@ -302,11 +308,10 @@ def create_app():
                     design_btn = gr.Button("Generate Audio", variant="primary", size="lg")
                 with gr.Column():
                     design_audio  = gr.Audio(label="Generated Speech")
-                    gr.HTML("<div style='height: 20px;'></div>")
-                    design_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    gr.HTML("<div style='height: 20px;'></div>")
-                    design_status = gr.Textbox(label="Status", interactive=False, lines=2)
-                    
+                    with gr.Group():
+                        design_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    with gr.Group(elem_classes="panel-spacer"):
+                        design_status = gr.Textbox(label="Status", interactive=False, lines=2)
                     design_zip    = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
             def on_design(text, desc, temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc):
@@ -358,26 +363,23 @@ def create_app():
             Upload a reference audio clip and its transcript, give the role a name, then hit **Compile**.  
             The resulting `.qwen3tts` file can be loaded into any Role panel in the **Voice Cloning** tab via **Load Role** — no need to re-process reference audio each session.
             """)
-            with gr.Column():
-                # Top section for inputs
-                maker_audio = gr.Audio(label="Reference Audio", type="filepath")
-                maker_text  = gr.Textbox(label="Transcript",
-                                         placeholder="Type transcript or use Trans Ref...", lines=4)
-                with gr.Row():
-                    maker_trans = gr.Button("Trans Ref", variant="primary", size="sm")
-                    maker_zip   = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="primary", size="sm")
-                    maker_txt   = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="primary", size="sm")
-                    maker_clear = gr.Button("Clear", variant="secondary", size="sm")
-                
-                # Bottom section for processing and outputs (aligned side-by-side)
-                with gr.Row():
-                    with gr.Column(scale=1):
-                        maker_name    = gr.Textbox(label="Role Name (used as filename)", placeholder="e.g. Natasha")
-                        maker_compile = gr.Button("COMPILE TO .QWEN3TTS", variant="primary", size="lg")
-                    
-                    with gr.Column(scale=1):
-                        maker_download = gr.File(label="Download Compiled Voice (.qwen3tts)")
-                        maker_status   = gr.Textbox(label="Status", value="Ready", interactive=False, lines=2)
+            with gr.Row():
+                with gr.Column():
+                    maker_audio = gr.Audio(label="Reference Audio", type="filepath")
+                    maker_text  = gr.Textbox(label="Transcript",
+                                             placeholder="Type transcript or use Trans Ref...", lines=4)
+                    with gr.Row():
+                        maker_trans = gr.Button("Trans Ref", variant="primary", size="sm")
+                        maker_zip   = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="primary", size="sm")
+                        maker_txt   = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="primary", size="sm")
+                        maker_clear = gr.Button("Clear", variant="secondary", size="sm")
+                    with gr.Row(variant="compact"):
+                        maker_name    = gr.Textbox(label="Role Name (used as filename)", placeholder="e.g. Natasha", scale=4)
+                        maker_compile = gr.Button("COMPILE TO .QWEN3TTS", variant="primary", size="sm", scale=1, elem_classes="inline-button")
+
+                with gr.Column():
+                    maker_download = gr.File(label="Download Compiled Voice (.qwen3tts)")
+                    maker_status   = gr.Textbox(label="Status", value="Ready", interactive=False, lines=2)
 
             maker_trans.click(on_transcribe, inputs=[maker_audio], outputs=[maker_text])
             maker_zip.upload(process_ref_zip, inputs=[maker_zip], outputs=[maker_audio, maker_text])
@@ -389,7 +391,7 @@ def create_app():
                 def _cb(msg): status_msgs.append(msg)
                 yield gr.update(), f"Starting compilation for '{name}'..."
                 filepath, final_msg = compile_role(audio, text, name, status_callback=_cb)
-                log = "\n".join(status_msgs[-2:]) + "\n" + final_msg # only show last 2 lines for shorter status box
+                log = "\n".join(status_msgs[-8:]) + "\n" + final_msg
                 if filepath and os.path.exists(filepath):
                     yield gr.update(value=filepath, visible=True), log
                 else:
