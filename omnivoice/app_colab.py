@@ -122,11 +122,12 @@ def create_app():
                 # Note: To actually see the chunk updates in Gradio, 
                 # we need to make the engine functions generators 
                 # or handle updates differently.
-                # Note: voice_clone is now a generator that yields status strings
+                tts_start = time.time()
                 audio_path = None
                 for status in voice_clone(text, audio, transcript, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}")):
                     if isinstance(status, str):
-                        yield gr.update(), status, gr.update(visible=False), gr.update()
+                        # Map to 4th output (status panel)
+                        yield gr.update(), gr.update(), gr.update(visible=False), status
                     else:
                         audio_path, _ = status
                 
@@ -137,7 +138,7 @@ def create_app():
                     return
                 
                 # Show audio immediately
-                yield audio_path, "⏳ Audio ready. Aligning subtitles...", gr.update(visible=False)
+                yield audio_path, gr.update(), gr.update(visible=False), "⏳ Audio ready. Aligning subtitles..."
                 
                 # Phase 2: Subtitles (Memory Intensive)
                 asr_start = time.time()
@@ -194,7 +195,7 @@ def create_app():
                 audio_path = None
                 for status in custom_voice(text, name, instr, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}")):
                     if isinstance(status, str):
-                        yield gr.update(), status, gr.update(visible=False), gr.update()
+                        yield gr.update(), gr.update(), gr.update(visible=False), status
                     else:
                         audio_path, _ = status
                 
@@ -204,7 +205,7 @@ def create_app():
                     yield None, "❌ Generation failed.", gr.update(visible=False)
                     return
                 
-                yield audio_path, "⏳ Audio ready. Aligning subtitles...", gr.update(visible=False)
+                yield audio_path, gr.update(), gr.update(visible=False), "⏳ Audio ready. Aligning subtitles..."
                 
                 # Phase 2: SRT
                 asr_start = time.time()
@@ -251,7 +252,7 @@ def create_app():
                 audio_path = None
                 for status in voice_design(text, desc, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}")):
                     if isinstance(status, str):
-                        yield gr.update(), status, gr.update(visible=False), gr.update()
+                        yield gr.update(), gr.update(), gr.update(visible=False), status
                     else:
                         audio_path, _ = status
                 
@@ -261,7 +262,7 @@ def create_app():
                     yield None, "❌ Generation failed.", gr.update(visible=False)
                     return
                 
-                yield audio_path, "⏳ Audio ready. Aligning subtitles...", gr.update(visible=False)
+                yield audio_path, gr.update(), gr.update(visible=False), "⏳ Audio ready. Aligning subtitles..."
                 
                 # Phase 2: SRT
                 asr_start = time.time()
