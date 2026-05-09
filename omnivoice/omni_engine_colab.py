@@ -86,21 +86,31 @@ def voice_clone(text, reference_audio, ref_transcript):
         print(f"⏱️ Creating prompt...")
         prompt_start = time.time()
 
-        # Logic: If transcript is provided, use high-quality mode.
-        # If empty, fallback to x-vector only mode (Fast Mode).
+        # Logic: Prioritize high-quality cloning.
+        # If ref_transcript is provided, use it.
+        # If empty, attempt to use the model's internal ASR (x_vector_only_mode=False).
         if ref_transcript and ref_transcript.strip():
-            print("   Mode: High-Quality (using transcript)")
+            print("   Mode: High-Quality (using manual transcript)")
             prompt_items = model.create_voice_clone_prompt(
                 ref_audio=reference_audio,
                 ref_text=ref_transcript,
                 x_vector_only_mode=False
             )
         else:
-            print("   Mode: Standard (no transcript, using x-vector fallback)")
-            prompt_items = model.create_voice_clone_prompt(
-                ref_audio=reference_audio,
-                x_vector_only_mode=True
-            )
+            print("   Mode: High-Quality (attempting Auto-ASR)...")
+            try:
+                # In the official workflow, omitting ref_text with x_vector_only_mode=False 
+                # should trigger internal ASR for alignment.
+                prompt_items = model.create_voice_clone_prompt(
+                    ref_audio=reference_audio,
+                    x_vector_only_mode=False
+                )
+            except Exception as e:
+                print(f"   ⚠️ Auto-ASR failed: {str(e)}. Falling back to Standard Mode.")
+                prompt_items = model.create_voice_clone_prompt(
+                    ref_audio=reference_audio,
+                    x_vector_only_mode=True
+                )
 
         prompt_time = time.time() - prompt_start
         print(f"   Prompt: {prompt_time:.1f}s")
