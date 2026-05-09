@@ -284,16 +284,14 @@ def clean_script(text):
     
     if not segments:
         # Mono Mode: Use aggressive regex cleaning
-        # Remove ## Name ##
         clean = re.sub(r"##.*?##", "", text, flags=re.DOTALL)
-        # Remove [pause:X]
         clean = re.sub(r"\[pause:\d+\.?\d*\]", "", clean, flags=re.DOTALL)
-        # Remove [anything else]
         clean = re.sub(r"\[.*?\]", "", clean, flags=re.DOTALL)
-        # Cleanup
-        return " ".join([l.strip() for l in clean.split('\n') if l.strip()])
+        # Preserve line breaks for smart_balanced_split
+        lines = [l.strip() for l in clean.split('\n') if l.strip()]
+        return "\n".join(lines)
 
-    # Multi Mode: Reconstruct from segments
+    # Multi Mode: Reconstruct from segments, preserving each line separately
     clean_parts = []
     for _, raw_content in segments:
         # A. Remove emotion tag from the start: [tag]
@@ -304,9 +302,11 @@ def clean_script(text):
         content = re.sub(r"\[.*?\]", "", content, flags=re.DOTALL)
         
         if content.strip():
+            # Keep each speaker's dialogue as its own line
             clean_parts.append(content.strip())
             
-    return " ".join(clean_parts)
+    # Join with newline to preserve sentence boundaries for the SRT splitter
+    return "\n".join(clean_parts)
 
 def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False, status_callback=None):
     """Generate speech using a Role Bank and script tags (## Name ##, [pause], [emotion])"""
