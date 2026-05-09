@@ -5,4 +5,3 @@ huggingface_hub
 qwen-tts
 accelerate
 soundfile
-flash-attn --no-build-isolation
