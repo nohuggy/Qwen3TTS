@@ -11,6 +11,7 @@ from qwen_tts import Qwen3TTSModel
 current_model = None
 current_model_type = None
 ASR_PIPE = None
+ALIGNER_PIPE = None
 
 # Device detection
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -44,9 +45,10 @@ def setup_asr():
         print("   📥 Pre-warming Qwen3-ASR-0.6B cache (HuggingFace)...")
         from huggingface_hub import snapshot_download
         snapshot_download(repo_id="Qwen/Qwen3-ASR-0.6B")
-        print("   ✅ ASR weights cached and ready.")
+        snapshot_download(repo_id="Qwen/Qwen3-ForcedAligner-0.6B")
+        print("   ✅ ASR & Aligner weights cached and ready.")
     except Exception as e:
-        print(f"   ⚠️ Could not pre-warm ASR cache: {e}")
+        print(f"   ⚠️ Could not pre-warm ASR/Aligner cache: {e}")
 
 # Run setup at boot
 setup_asr()
@@ -68,8 +70,9 @@ def load_model(model_type):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    # Ensure ASR is unloaded before loading TTS
+    # Ensure ASR and Aligner are unloaded before loading TTS
     unload_asr()
+    unload_aligner()
 
     print(f"Loading {model_type} model (1.7B) on {DEVICE}...")
     start = time.time()
@@ -106,10 +109,38 @@ def load_model(model_type):
         traceback.print_exc()
         return None
 
-def voice_clone(text, reference_audio, ref_transcript):
+def format_timestamp(seconds):
+    """Format seconds into SRT timestamp format (HH:MM:SS,mmm)"""
+    td = float(seconds)
+    hours = int(td // 3600)
+    minutes = int((td % 3600) // 60)
+    secs = int(td % 60)
+    millis = int((td % 1) * 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+
+def unify_punctuation(text):
+    """Clean up and unify punctuation for better TTS processing"""
+    if not text: return ""
+    # Map common Chinese punctuation to English for better processing if needed, 
+    # or just ensure consistent spacing.
+    replacements = {
+        '，': ',', '。': '.', '！': '!', '？': '?', 
+        '；': ';', '：': ':', '“': '"', '”': '"',
+        '‘': "'", '’': "'", '（': '(', '）': ')'
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
+
+def voice_clone(text, reference_audio, ref_transcript, gen_srt=False, convert_punc=False):
     """Generate speech by cloning a reference voice"""
     if not text or not reference_audio:
-        return None
+        return None, ""
+    
+    if convert_punc:
+        text = unify_punctuation(text)
+        if ref_transcript:
+            ref_transcript = unify_punctuation(ref_transcript)
 
     try:
         total_start = time.time()
@@ -175,16 +206,23 @@ def voice_clone(text, reference_audio, ref_transcript):
             torch.cuda.empty_cache()
         gc.collect()
 
-        return temp_file.name
+        srt_content = ""
+        if gen_srt:
+            srt_content = generate_srt(text, temp_file.name)
+
+        return temp_file.name, srt_content
 
     except Exception as e:
         print(f"❌ Error in voice_clone: {str(e)}")
-        return None
+        return None, ""
 
-def custom_voice(text, voice_name, instruction):
+def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=False):
     """Generate speech using preset voices"""
     if not text:
-        return None
+        return None, ""
+
+    if convert_punc:
+        text = unify_punctuation(text)
 
     try:
         total_start = time.time()
@@ -225,16 +263,23 @@ def custom_voice(text, voice_name, instruction):
             torch.cuda.empty_cache()
         gc.collect()
 
-        return temp_file.name
+        srt_content = ""
+        if gen_srt:
+            srt_content = generate_srt(text, temp_file.name)
+
+        return temp_file.name, srt_content
 
     except Exception as e:
         print(f"❌ Error in custom_voice: {str(e)}")
-        return None
+        return None, ""
 
-def voice_design(text, voice_description):
+def voice_design(text, voice_description, gen_srt=False, convert_punc=False):
     """Generate speech from text description"""
     if not text or not voice_description:
-        return None
+        return None, ""
+
+    if convert_punc:
+        text = unify_punctuation(text)
 
     try:
         total_start = time.time()
@@ -268,11 +313,15 @@ def voice_design(text, voice_description):
             torch.cuda.empty_cache()
         gc.collect()
 
-        return temp_file.name
+        srt_content = ""
+        if gen_srt:
+            srt_content = generate_srt(text, temp_file.name)
+
+        return temp_file.name, srt_content
 
     except Exception as e:
         print(f"❌ Error in voice_design: {str(e)}")
-        return None
+        return None, ""
 
 def get_asr_pipe():
     """Load Qwen3-ASR-0.6B model"""
@@ -344,3 +393,97 @@ def transcribe_ref(audio_path):
     except Exception as e:
         print(f"❌ Transcription Error: {e}")
         return f"Error: {e}"
+
+def get_aligner_pipe():
+    """Load Qwen3-ForcedAligner-0.6B model"""
+    global ALIGNER_PIPE
+    if ALIGNER_PIPE is None:
+        print("Loading Qwen3-ForcedAligner-0.6B model...")
+        # Unload TTS and ASR first to save VRAM
+        global current_model, current_model_type
+        if current_model is not None:
+            print(f"Unloading {current_model_type} model before Aligner...")
+            del current_model
+            current_model = None
+            current_model_type = None
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        unload_asr()
+        
+        try:
+            # The Forced Aligner is typically loaded via Qwen3ASRModel with specific config
+            # Or if it's a standalone model, we use it directly.
+            # According to Qwen3-ASR docs, we can use the ASR model with return_time_stamps=True
+            # which internally uses the Forced Aligner.
+            # To save VRAM, we'll load the ASR-1.7B or ASR-0.6B if we need alignment.
+            # However, since the user asked for Qwen3-ForcedAligner-0.6B specifically:
+            from qwen_asr import Qwen3ASRModel
+            ALIGNER_PIPE = Qwen3ASRModel.from_pretrained(
+                "Qwen/Qwen3-ASR-0.6B", # Use the ASR model as the frontend
+                dtype=DTYPE,
+                device_map=DEVICE,
+                forced_aligner="Qwen/Qwen3-ForcedAligner-0.6B",
+                attn_implementation="sdpa" if torch.cuda.is_available() else "eager"
+            )
+            print("✅ Forced Aligner loaded")
+        except Exception as e:
+            print(f"❌ Aligner Load Error: {e}")
+            return None
+    return ALIGNER_PIPE
+
+def unload_aligner():
+    """Unload Aligner model to save VRAM"""
+    global ALIGNER_PIPE
+    if ALIGNER_PIPE is not None:
+        print("🗑️ Unloading Aligner Engine...")
+        del ALIGNER_PIPE
+        ALIGNER_PIPE = None
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+def generate_srt(text, audio_path):
+    """Generate SRT subtitles using Forced Aligner"""
+    if not text or not audio_path:
+        return ""
+    try:
+        model = get_aligner_pipe()
+        if model is None: return ""
+        
+        print("🔍 Generating subtitles (Forced Aligner)...")
+        # For alignment, we provide the reference text
+        results = model.transcribe(
+            audio=audio_path,
+            context=text,
+            return_time_stamps=True
+        )
+        
+        if not results or not results[0].time_stamps:
+            print("⚠️ No timestamps generated.")
+            return ""
+        
+        srt_content = ""
+        # Group word-level timestamps into readable segments
+        # Qwen3-ASR returns a list of Timestamp objects
+        ts = results[0].time_stamps
+        
+        # Simple grouping: 10 words per line
+        words_per_line = 10
+        for i in range(0, len(ts), words_per_line):
+            chunk = ts[i:i+words_per_line]
+            start = format_timestamp(chunk[0].start_time)
+            end = format_timestamp(chunk[-1].end_time)
+            line_text = "".join([c.text for c in chunk]).strip()
+            srt_content += f"{(i//words_per_line)+1}\n{start} --> {end}\n{line_text}\n\n"
+        
+        print("✅ SRT generated successfully")
+        # Auto offload after task
+        unload_aligner()
+        return srt_content.strip()
+    except Exception as e:
+        print(f"❌ SRT Generation Error: {e}")
+        import traceback
+        traceback.print_exc()
+        unload_aligner()
+        return f"SRT Error: {e}"

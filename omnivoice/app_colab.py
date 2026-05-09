@@ -10,6 +10,19 @@ custom_css = """
 }
 """
 
+def package_zip(audio_path, srt_content):
+    if not audio_path: return None
+    import zipfile
+    zip_path = audio_path.replace(".wav", ".zip")
+    with zipfile.ZipFile(zip_path, 'w') as z:
+        z.write(audio_path, arcname=os.path.basename(audio_path))
+        if srt_content:
+            srt_path = audio_path.replace(".wav", ".srt")
+            with open(srt_path, "w", encoding="utf-8") as f:
+                f.write(srt_content)
+            z.write(srt_path, arcname=os.path.basename(srt_path))
+    return zip_path
+
 def create_app():
     with gr.Blocks(title="Qwen3-TTS", css=custom_css) as demo:
         # Main Title
@@ -29,9 +42,15 @@ def create_app():
                         ref_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="secondary")
                         ref_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="secondary")
                         
+                    with gr.Accordion("Advanced Settings", open=False):
+                        clone_gen_srt = gr.Checkbox(label="Generate Subtitles", value=True)
+                        clone_conv_punc = gr.Checkbox(label="Convert Punctuation", value=True)
+
                     clone_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
                     clone_output = gr.Audio(label="Generated Speech")
+                    clone_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    clone_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
 
             # Transcription handler
             def on_transcribe(audio):
@@ -68,11 +87,16 @@ def create_app():
                     with open(txt_file.name, 'r', encoding='gbk') as tf:
                         return tf.read()
 
+            def on_clone(text, audio, transcript, gen_srt, conv_punc):
+                audio_path, srt = voice_clone(text, audio, transcript, gen_srt=gen_srt, convert_punc=conv_punc)
+                zip_path = package_zip(audio_path, srt)
+                return audio_path, srt, gr.update(value=zip_path, visible=True)
+
             trans_btn.click(on_transcribe, inputs=[clone_audio], outputs=[clone_transcript])
             ref_zip_btn.upload(process_ref_zip, inputs=[ref_zip_btn], outputs=[clone_audio, clone_transcript])
             ref_txt_btn.upload(process_ref_txt, inputs=[ref_txt_btn], outputs=[clone_transcript])
 
-            clone_btn.click(voice_clone, inputs=[clone_text, clone_audio, clone_transcript], outputs=clone_output)
+            clone_btn.click(on_clone, inputs=[clone_text, clone_audio, clone_transcript, clone_gen_srt, clone_conv_punc], outputs=[clone_output, clone_srt_preview, clone_zip_dl])
 
         with gr.Tab("Custom Voice"):
             gr.Markdown("### Use 9 preset character voices with style control")
@@ -84,11 +108,23 @@ def create_app():
                         label="Voice Character", value="serena"
                     )
                     custom_instruction = gr.Textbox(label="Style Instruction (Optional)", placeholder="e.g., 'speak slowly and cheerfully'", lines=2)
+                    
+                    with gr.Accordion("Advanced Settings", open=False):
+                        custom_gen_srt = gr.Checkbox(label="Generate Subtitles", value=True)
+                        custom_conv_punc = gr.Checkbox(label="Convert Punctuation", value=True)
+                        
                     custom_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
                     custom_output = gr.Audio(label="Generated Speech")
+                    custom_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    custom_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
 
-            custom_btn.click(custom_voice, inputs=[custom_text, custom_voice_name, custom_instruction], outputs=custom_output)
+            def on_custom(text, name, instr, gen_srt, conv_punc):
+                audio_path, srt = custom_voice(text, name, instr, gen_srt=gen_srt, convert_punc=conv_punc)
+                zip_path = package_zip(audio_path, srt)
+                return audio_path, srt, gr.update(value=zip_path, visible=True)
+
+            custom_btn.click(on_custom, inputs=[custom_text, custom_voice_name, custom_instruction, custom_gen_srt, custom_conv_punc], outputs=[custom_output, custom_srt_preview, custom_zip_dl])
 
         with gr.Tab("Voice Design"):
             gr.Markdown("### Design a unique voice from text description")
@@ -96,11 +132,23 @@ def create_app():
                 with gr.Column():
                     design_text = gr.Textbox(label="Text to Synthesize", placeholder="Enter text...", lines=4)
                     design_description = gr.Textbox(label="Voice Description", placeholder="A young female, cheerful, speaking clearly", lines=4)
+                    
+                    with gr.Accordion("Advanced Settings", open=False):
+                        design_gen_srt = gr.Checkbox(label="Generate Subtitles", value=True)
+                        design_conv_punc = gr.Checkbox(label="Convert Punctuation", value=True)
+                        
                     design_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
                     design_output = gr.Audio(label="Generated Speech")
+                    design_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    design_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
 
-            design_btn.click(voice_design, inputs=[design_text, design_description], outputs=design_output)
+            def on_design(text, desc, gen_srt, conv_punc):
+                audio_path, srt = voice_design(text, desc, gen_srt=gen_srt, convert_punc=conv_punc)
+                zip_path = package_zip(audio_path, srt)
+                return audio_path, srt, gr.update(value=zip_path, visible=True)
+
+            design_btn.click(on_design, inputs=[design_text, design_description, design_gen_srt, design_conv_punc], outputs=[design_output, design_srt_preview, design_zip_dl])
 
     return demo
 
