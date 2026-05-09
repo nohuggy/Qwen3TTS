@@ -25,27 +25,29 @@ custom_css = """
     margin-bottom: 8px;
     font-family: monospace;
 }
+/* Small gap above Status panel */
+.status-gap {
+    margin-top: 8px !important;
+}
 /* Load Role button overlaid inside the Role Name textbox */
-.role-name-row {
+.role-name-wrap {
     position: relative !important;
 }
-.role-name-row > div:first-child {
-    flex: 1 !important;
-}
-.role-name-row > div:last-child {
+.role-name-wrap .load-role-btn {
     position: absolute !important;
-    right: 8px !important;
-    bottom: 8px !important;
-    z-index: 10 !important;
+    right: 6px !important;
+    bottom: 6px !important;
+    z-index: 100 !important;
 }
-.role-name-row > div:last-child button {
+.role-name-wrap .load-role-btn button {
     font-size: 0.75rem !important;
-    padding: 4px 10px !important;
-    height: 28px !important;
+    padding: 3px 10px !important;
+    height: 26px !important;
     min-width: auto !important;
-    opacity: 0.85;
+    opacity: 0.8;
+    border-radius: 4px !important;
 }
-.role-name-row > div:last-child button:hover {
+.role-name-wrap .load-role-btn button:hover {
     opacity: 1;
 }
 """
@@ -192,10 +194,11 @@ def create_app():
 
                     def _role_panel(label, open_=True, name_ph="e.g. Alex"):
                         with gr.Accordion(label, open=open_):
-                            with gr.Row(elem_classes="role-name-row"):
+                            with gr.Column(elem_classes="role-name-wrap"):
                                 rname = gr.Textbox(label="Role Name", placeholder=name_ph, value="")
                                 rload = gr.UploadButton("Load Role", file_types=[".qwen3tts"],
-                                                        variant="secondary", size="sm")
+                                                        variant="secondary", size="sm",
+                                                        elem_classes="load-role-btn")
                             
                             with gr.Column(visible=True) as extra_fields:
                                 raudio = gr.Audio(label="Reference Audio", type="filepath")
@@ -218,7 +221,7 @@ def create_app():
                 with gr.Column():
                     audio_out  = gr.Audio(label="Generated Speech")
                     srt_out    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    status_out = gr.Textbox(label="Status", value="", interactive=False, lines=2)
+                    status_out = gr.Textbox(label="Status", value="", interactive=False, lines=2, elem_classes="status-gap")
                     temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc = _adv_accordion()
                     btn     = gr.Button("Generate Audio", variant="primary", size="lg")
                     zip_out = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
@@ -262,7 +265,7 @@ def create_app():
                 with gr.Column():
                     custom_audio  = gr.Audio(label="Generated Speech")
                     custom_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    custom_status = gr.Textbox(label="Status", interactive=False, lines=2)
+                    custom_status = gr.Textbox(label="Status", interactive=False, lines=2, elem_classes="status-gap")
                     custom_zip    = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
             def on_custom(text, name, instr, temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc):
@@ -321,7 +324,7 @@ def create_app():
                 with gr.Column():
                     design_audio  = gr.Audio(label="Generated Speech")
                     design_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    design_status = gr.Textbox(label="Status", interactive=False, lines=2)
+                    design_status = gr.Textbox(label="Status", interactive=False, lines=2, elem_classes="status-gap")
                     design_zip    = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
             def on_design(text, desc, temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc):
