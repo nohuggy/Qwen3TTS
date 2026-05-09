@@ -10,7 +10,7 @@ custom_css = """
 """
 
 def create_app():
-    with gr.Blocks(title="Qwen3-TTS", css=custom_css) as demo:
+    with gr.Blocks(title="Qwen3-TTS") as demo:
         # Main Title
         gr.Markdown("# 🎙️ Qwen3-TTS")
         gr.Markdown("Advanced Text-to-Speech AI | Voice Cloning, Custom Voice & Voice Design")
@@ -64,4 +64,4 @@ def create_app():
 
 if __name__ == "__main__":
     demo = create_app()
-    demo.launch(share=True)
+    demo.launch(share=True, css=custom_css)
