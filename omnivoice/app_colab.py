@@ -165,27 +165,27 @@ def create_app():
                         r1_audio = gr.Audio(label="Reference Audio", type="filepath")
                         r1_text = gr.Textbox(label="Reference Transcript", placeholder="Text from the audio...")
                         with gr.Row():
-                            r1_trans_btn = gr.Button("Trans Ref", variant="secondary", size="sm")
-                            r1_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="secondary", size="sm")
-                            r1_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="secondary", size="sm")
+                            r1_trans_btn = gr.Button("Trans Ref", variant="primary", size="sm")
+                            r1_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="primary", size="sm")
+                            r1_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="primary", size="sm")
                     
                     with gr.Accordion("Role 2", open=False):
                         r2_name = gr.Textbox(label="Role Name", placeholder="e.g. Sara")
                         r2_audio = gr.Audio(label="Reference Audio", type="filepath")
                         r2_text = gr.Textbox(label="Reference Transcript", placeholder="Text from the audio...")
                         with gr.Row():
-                            r2_trans_btn = gr.Button("Trans Ref", variant="secondary", size="sm")
-                            r2_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="secondary", size="sm")
-                            r2_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="secondary", size="sm")
+                            r2_trans_btn = gr.Button("Trans Ref", variant="primary", size="sm")
+                            r2_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="primary", size="sm")
+                            r2_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="primary", size="sm")
                         
                     with gr.Accordion("Role 3", open=False):
                         r3_name = gr.Textbox(label="Role Name", placeholder="e.g. Bob")
                         r3_audio = gr.Audio(label="Reference Audio", type="filepath")
                         r3_text = gr.Textbox(label="Reference Transcript", placeholder="Text from the audio...")
                         with gr.Row():
-                            r3_trans_btn = gr.Button("Trans Ref", variant="secondary", size="sm")
-                            r3_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="secondary", size="sm")
-                            r3_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="secondary", size="sm")
+                            r3_trans_btn = gr.Button("Trans Ref", variant="primary", size="sm")
+                            r3_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="primary", size="sm")
+                            r3_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="primary", size="sm")
 
                 with gr.Column():
                     with gr.Group():
