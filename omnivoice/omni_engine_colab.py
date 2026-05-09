@@ -5,6 +5,8 @@ import soundfile as sf
 import tempfile
 import os
 os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["PYTHONWARNINGS"] = "ignore"
 import re
 import difflib
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"

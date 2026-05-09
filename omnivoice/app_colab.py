@@ -1,4 +1,6 @@
 import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["PYTHONWARNINGS"] = "ignore"
 import gradio as gr
 from omnivoice.omni_engine_colab import voice_clone, custom_voice, voice_design, transcribe_ref
 
