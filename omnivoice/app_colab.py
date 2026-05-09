@@ -122,11 +122,14 @@ def create_app():
                 # Note: To actually see the chunk updates in Gradio, 
                 # we need to make the engine functions generators 
                 # or handle updates differently.
-                # For now, we'll implement a simple generator pattern 
-                # for the engine to yield status.
+                # Note: voice_clone is now a generator that yields status strings
+                audio_path = None
+                for status in voice_clone(text, audio, transcript, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}")):
+                    if isinstance(status, str):
+                        yield gr.update(), status, gr.update(visible=False), gr.update()
+                    else:
+                        audio_path, _ = status
                 
-                tts_start = time.time()
-                audio_path, _ = voice_clone(text, audio, transcript, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}"))
                 tts_dur = time.time() - tts_start
                 
                 if not audio_path:
@@ -188,7 +191,13 @@ def create_app():
                 start_time = time.time()
                 # Phase 1: Audio
                 tts_start = time.time()
-                audio_path, _ = custom_voice(text, name, instr, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}"))
+                audio_path = None
+                for status in custom_voice(text, name, instr, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}")):
+                    if isinstance(status, str):
+                        yield gr.update(), status, gr.update(visible=False), gr.update()
+                    else:
+                        audio_path, _ = status
+                
                 tts_dur = time.time() - tts_start
                 
                 if not audio_path:
@@ -239,7 +248,13 @@ def create_app():
                 start_time = time.time()
                 # Phase 1: Audio
                 tts_start = time.time()
-                audio_path, _ = voice_design(text, desc, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}"))
+                audio_path = None
+                for status in voice_design(text, desc, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}")):
+                    if isinstance(status, str):
+                        yield gr.update(), status, gr.update(visible=False), gr.update()
+                    else:
+                        audio_path, _ = status
+                
                 tts_dur = time.time() - tts_start
                 
                 if not audio_path:

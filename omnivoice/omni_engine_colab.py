@@ -59,15 +59,15 @@ def setup_asr():
 setup_asr()
 
 def load_model(model_type):
-    """Load model with appropriate hardware optimization"""
+    """Load model with status yielding for UI"""
     global current_model, current_model_type
-
+    
     if current_model_type == model_type:
-        print(f"✅ Using cached {model_type} model")
+        yield f"Using cached {model_type} model"
         return current_model
 
     if current_model is not None:
-        print(f"Unloading {current_model_type} model...")
+        yield f"Unloading {current_model_type} model..."
         del current_model
         current_model = None
         current_model_type = None
@@ -79,8 +79,8 @@ def load_model(model_type):
     # Ensure ASR and Aligner are unloaded before loading TTS
     unload_asr()
     unload_aligner()
-
-    print(f"Loading {model_type} model (1.7B) on {DEVICE}...")
+    
+    yield f"Loading {model_type} model (1.7B) on {DEVICE}..."
     start = time.time()
 
     try:
@@ -283,11 +283,20 @@ def voice_clone(text, reference_audio, ref_transcript, gen_srt=False, convert_pu
 
     try:
         total_start = time.time()
-        model = load_model("base")
+        # Phase 0: Load Model
+        model = None
+        for status in load_model("base"):
+            if isinstance(status, str):
+                if status_callback: status_callback(status)
+                yield status
+            else:
+                model = status
+        
         if model is None:
             return None
 
-        print(f"⏱️ Creating prompt...")
+        yield "Creating prompt..."
+        if status_callback: status_callback("Creating prompt...")
         prompt_start = time.time()
 
         # Logic: Prioritize high-quality cloning.
@@ -329,9 +338,10 @@ def voice_clone(text, reference_audio, ref_transcript, gen_srt=False, convert_pu
             sr = 24000 # Default for Qwen3-TTS
             
             for i, p in enumerate(paragraphs):
-                if status_callback:
-                    status_callback(f"Generating chunk {i+1}/{len(paragraphs)}...")
-                print(f"   Chunk {i+1}/{len(paragraphs)}...")
+                msg = f"Generating chunk {i+1}/{len(paragraphs)}..."
+                if status_callback: status_callback(msg)
+                yield msg
+                print(f"   {msg}")
                 
                 wavs, sr = model.generate_voice_clone(
                     text=p,
@@ -366,7 +376,7 @@ def voice_clone(text, reference_audio, ref_transcript, gen_srt=False, convert_pu
         if gen_srt:
             srt_content = generate_srt(text, temp_file.name)
 
-        return temp_file.name, srt_content
+        yield (temp_file.name, srt_content)
 
     except Exception as e:
         print(f"❌ Error in voice_clone: {str(e)}")
@@ -382,11 +392,19 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
 
     try:
         total_start = time.time()
-        model = load_model("custom")
+        # Phase 0: Load Model
+        model = None
+        for status in load_model("custom"):
+            if isinstance(status, str):
+                if status_callback: status_callback(status)
+                yield status
+            else:
+                model = status
+        
         if model is None:
             return None
 
-        print(f"⏱️ Generating with voice: {voice_name}...")
+        yield f"Generating with voice: {voice_name}..."
         gen_start = time.time()
 
         with torch.inference_mode():
@@ -396,9 +414,10 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
             sr = 24000
             
             for i, p in enumerate(paragraphs):
-                if status_callback:
-                    status_callback(f"Generating chunk {i+1}/{len(paragraphs)}...")
-                print(f"   Chunk {i+1}/{len(paragraphs)}...")
+                msg = f"Generating chunk {i+1}/{len(paragraphs)}..."
+                if status_callback: status_callback(msg)
+                yield msg
+                print(f"   {msg}")
                 
                 if instruction and instruction.strip():
                     wavs, sr = model.generate_custom_voice(
@@ -440,7 +459,7 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
         if gen_srt:
             srt_content = generate_srt(text, temp_file.name)
 
-        return temp_file.name, srt_content
+        yield (temp_file.name, srt_content)
 
     except Exception as e:
         print(f"❌ Error in custom_voice: {str(e)}")
@@ -456,11 +475,19 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False, sta
 
     try:
         total_start = time.time()
-        model = load_model("design")
+        # Phase 0: Load Model
+        model = None
+        for status in load_model("design"):
+            if isinstance(status, str):
+                if status_callback: status_callback(status)
+                yield status
+            else:
+                model = status
+        
         if model is None:
             return None
 
-        print(f"⏱️ Generating...")
+        yield "Generating voice design..."
         gen_start = time.time()
 
         with torch.inference_mode():
@@ -470,9 +497,10 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False, sta
             sr = 24000
             
             for i, p in enumerate(paragraphs):
-                if status_callback:
-                    status_callback(f"Generating chunk {i+1}/{len(paragraphs)}...")
-                print(f"   Chunk {i+1}/{len(paragraphs)}...")
+                msg = f"Generating chunk {i+1}/{len(paragraphs)}..."
+                if status_callback: status_callback(msg)
+                yield msg
+                print(f"   {msg}")
                 
                 wavs, sr = model.generate_voice_design(
                     text=p,
@@ -498,13 +526,9 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False, sta
         
         del all_wavs
         gc.collect()
-        time.sleep(1)
+        time.sleep(0.5)
 
-        srt_content = ""
-        if gen_srt:
-            srt_content = generate_srt(text, temp_file.name)
-
-        return temp_file.name, srt_content
+        yield (temp_file.name, "")
 
     except Exception as e:
         print(f"❌ Error in voice_design: {str(e)}")
