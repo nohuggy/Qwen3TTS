@@ -134,15 +134,16 @@ def create_app():
                     pass
                 
                 # Note: To actually see the chunk updates in Gradio, 
-                # we need to make the engine functions generators 
-                # or handle updates differently.
+                # Clear previous outputs immediately
+                yield None, "", gr.update(visible=False), "⏳ Initializing..."
+                
                 tts_start = time.time()
                 audio_path = None
                 last_status = ""
                 for status in voice_clone(text, audio, transcript, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}")):
                     if isinstance(status, str):
                         last_status = status
-                        yield gr.update(), gr.update(), gr.update(visible=False), status
+                        yield None, "", gr.update(visible=False), status
                     else:
                         audio_path, _ = status
                 
@@ -210,6 +211,9 @@ def create_app():
             def on_custom(text, name, instr, gen_srt, conv_punc):
                 import time
                 start_time = time.time()
+                # Clear previous outputs
+                yield None, "", gr.update(visible=False), "⏳ Initializing..."
+                
                 # Phase 1: Audio
                 tts_start = time.time()
                 audio_path = None
@@ -217,7 +221,7 @@ def create_app():
                 for status in custom_voice(text, name, instr, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}")):
                     if isinstance(status, str):
                         last_status = status
-                        yield gr.update(), gr.update(), gr.update(visible=False), status
+                        yield None, "", gr.update(visible=False), status
                     else:
                         audio_path, _ = status
                 
@@ -275,6 +279,9 @@ def create_app():
             def on_design(text, desc, gen_srt, conv_punc):
                 import time
                 start_time = time.time()
+                # Clear previous outputs
+                yield None, "", gr.update(visible=False), "⏳ Initializing..."
+                
                 # Phase 1: Audio
                 tts_start = time.time()
                 audio_path = None
@@ -282,7 +289,7 @@ def create_app():
                 for status in voice_design(text, desc, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}")):
                     if isinstance(status, str):
                         last_status = status
-                        yield gr.update(), gr.update(), gr.update(visible=False), status
+                        yield None, "", gr.update(visible=False), status
                     else:
                         audio_path, _ = status
                 
