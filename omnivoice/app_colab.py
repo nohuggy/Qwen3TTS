@@ -2,7 +2,7 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["PYTHONWARNINGS"] = "ignore"
 import gradio as gr
-from omnivoice.omni_engine_colab import voice_clone, custom_voice, voice_design, transcribe_ref
+from omnivoice.omni_engine_colab import voice_clone, custom_voice, voice_design, transcribe_ref, compile_role
 import time
 import re
 
@@ -115,9 +115,9 @@ def create_app():
                         return tf.read()
 
             def on_clone(text, 
-                         name1, audio1, text1, 
-                         name2, audio2, text2, 
-                         name3, audio3, text3, 
+                         name1, audio1, text1, qwen3ts1,
+                         name2, audio2, text2, qwen3ts2,
+                         name3, audio3, text3, qwen3ts3,
                          gen_srt, conv_punc,
                          temperature, top_p, repetition_penalty, subtalker_temperature):
                 import time
@@ -125,11 +125,17 @@ def create_app():
                 # Clear previous outputs immediately
                 yield None, "", gr.update(visible=False), "Initializing..."
                 
-                # Build role bank data
+                # Build role bank data — include qwen3tts_path when a compiled file is uploaded
                 role_bank_data = []
-                if audio1: role_bank_data.append({'name': name1, 'audio': audio1, 'text': text1})
-                if audio2: role_bank_data.append({'name': name2, 'audio': audio2, 'text': text2})
-                if audio3: role_bank_data.append({'name': name3, 'audio': audio3, 'text': text3})
+                if audio1 or qwen3ts1:
+                    role_bank_data.append({'name': name1, 'audio': audio1, 'text': text1,
+                                           'qwen3tts_path': qwen3ts1})
+                if audio2 or qwen3ts2:
+                    role_bank_data.append({'name': name2, 'audio': audio2, 'text': text2,
+                                           'qwen3tts_path': qwen3ts2})
+                if audio3 or qwen3ts3:
+                    role_bank_data.append({'name': name3, 'audio': audio3, 'text': text3,
+                                           'qwen3tts_path': qwen3ts3})
                 
                 tts_start = time.time()
                 audio_path = None
@@ -192,6 +198,8 @@ def create_app():
                             r1_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="primary", size="sm")
                             r1_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="primary", size="sm")
                             r1_clear_btn = gr.Button("Clear", variant="secondary", size="sm")
+                        r1_qwen3tts = gr.File(label="Upload .qwen3tts (skips ref audio)",
+                                              file_types=[".qwen3tts"], type="filepath", visible=True)
                     
                     with gr.Accordion("Role 2", open=False):
                         r2_name = gr.Textbox(label="Role Name", placeholder="e.g. Sara")
@@ -202,6 +210,8 @@ def create_app():
                             r2_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="primary", size="sm")
                             r2_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="primary", size="sm")
                             r2_clear_btn = gr.Button("Clear", variant="secondary", size="sm")
+                        r2_qwen3tts = gr.File(label="Upload .qwen3tts (skips ref audio)",
+                                              file_types=[".qwen3tts"], type="filepath", visible=True)
                         
                     with gr.Accordion("Role 3", open=False):
                         r3_name = gr.Textbox(label="Role Name", placeholder="e.g. Bob")
@@ -212,6 +222,8 @@ def create_app():
                             r3_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="primary", size="sm")
                             r3_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="primary", size="sm")
                             r3_clear_btn = gr.Button("Clear", variant="secondary", size="sm")
+                        r3_qwen3tts = gr.File(label="Upload .qwen3tts (skips ref audio)",
+                                              file_types=[".qwen3tts"], type="filepath", visible=True)
 
                 with gr.Column():
                     with gr.Group():
@@ -242,23 +254,33 @@ def create_app():
             r1_trans_btn.click(on_transcribe, inputs=[r1_audio], outputs=[r1_text])
             r1_zip_btn.upload(process_ref_zip, inputs=[r1_zip_btn], outputs=[r1_audio, r1_text])
             r1_txt_btn.upload(process_ref_txt, inputs=[r1_txt_btn], outputs=[r1_text])
-            r1_clear_btn.click(lambda: (None, None, ""), outputs=[r1_name, r1_audio, r1_text])
+            r1_clear_btn.click(lambda: (None, None, "", None), outputs=[r1_name, r1_audio, r1_text, r1_qwen3tts])
+            # Auto-fill role name from .qwen3tts filename
+            r1_qwen3tts.upload(lambda f: os.path.splitext(os.path.basename(f))[0] if f else gr.update(),
+                               inputs=[r1_qwen3tts], outputs=[r1_name])
             
             # Role 2
             r2_trans_btn.click(on_transcribe, inputs=[r2_audio], outputs=[r2_text])
             r2_zip_btn.upload(process_ref_zip, inputs=[r2_zip_btn], outputs=[r2_audio, r2_text])
             r2_txt_btn.upload(process_ref_txt, inputs=[r2_txt_btn], outputs=[r2_text])
-            r2_clear_btn.click(lambda: (None, None, ""), outputs=[r2_name, r2_audio, r2_text])
+            r2_clear_btn.click(lambda: (None, None, "", None), outputs=[r2_name, r2_audio, r2_text, r2_qwen3tts])
+            r2_qwen3tts.upload(lambda f: os.path.splitext(os.path.basename(f))[0] if f else gr.update(),
+                               inputs=[r2_qwen3tts], outputs=[r2_name])
             
             # Role 3
             r3_trans_btn.click(on_transcribe, inputs=[r3_audio], outputs=[r3_text])
             r3_zip_btn.upload(process_ref_zip, inputs=[r3_zip_btn], outputs=[r3_audio, r3_text])
             r3_txt_btn.upload(process_ref_txt, inputs=[r3_txt_btn], outputs=[r3_text])
-            r3_clear_btn.click(lambda: (None, None, ""), outputs=[r3_name, r3_audio, r3_text])
+            r3_clear_btn.click(lambda: (None, None, "", None), outputs=[r3_name, r3_audio, r3_text, r3_qwen3tts])
+            r3_qwen3tts.upload(lambda f: os.path.splitext(os.path.basename(f))[0] if f else gr.update(),
+                               inputs=[r3_qwen3tts], outputs=[r3_name])
 
             btn.click(
                 on_clone,
-                inputs=[input_text, r1_name, r1_audio, r1_text, r2_name, r2_audio, r2_text, r3_name, r3_audio, r3_text,
+                inputs=[input_text,
+                        r1_name, r1_audio, r1_text, r1_qwen3tts,
+                        r2_name, r2_audio, r2_text, r2_qwen3tts,
+                        r3_name, r3_audio, r3_text, r3_qwen3tts,
                         gen_srt, conv_punc, temperature, top_p, repetition_penalty, subtalker_temperature],
                 outputs=[audio_out, srt_out, zip_out, status_out]
             )
@@ -408,6 +430,70 @@ def create_app():
                 on_design,
                 inputs=[design_text, design_desc, design_gen_srt, design_conv_punc],
                 outputs=[design_audio, design_srt, design_zip, design_status]
+            )
+
+        # ─────────────────────────────────────────────
+        # ROLE MAKER TAB — compile .qwen3tts files
+        # ─────────────────────────────────────────────
+        with gr.Tab("🔧 Role Maker"):
+            gr.Markdown("""
+            ### Compile a Voice → `.qwen3tts`
+            Upload a reference audio clip and its transcript, give the role a name, then hit **Compile**.  
+            The resulting `.qwen3tts` file can be uploaded into any Role panel in the **Voice Cloning** tab — no need to re-process the reference audio each session.
+            """)
+            with gr.Row():
+                with gr.Column(scale=2):
+                    maker_audio = gr.Audio(label="Reference Audio", type="filepath")
+                    maker_text = gr.Textbox(
+                        label="Transcript",
+                        placeholder="Type the transcript, or use Trans Ref to auto-transcribe...",
+                        lines=4
+                    )
+                    with gr.Row():
+                        maker_trans_btn = gr.Button("Trans Ref", variant="primary", size="sm")
+                        maker_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="primary", size="sm")
+                        maker_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="primary", size="sm")
+                        maker_clear_btn = gr.Button("Clear", variant="secondary", size="sm")
+                    maker_name = gr.Textbox(
+                        label="Role Name (used as filename)",
+                        placeholder="e.g. Natasha"
+                    )
+                    maker_compile_btn = gr.Button("COMPILE TO .QWEN3TTS", variant="primary", size="lg")
+                
+                with gr.Column(scale=1):
+                    gr.Markdown("### Output")
+                    maker_download = gr.File(label="Download Compiled Voice (.qwen3tts)")
+                    gr.Markdown("### System Status")
+                    maker_status = gr.Textbox(
+                        label="", value="Ready", interactive=False, lines=4
+                    )
+
+            # Maker callbacks
+            maker_trans_btn.click(on_transcribe, inputs=[maker_audio], outputs=[maker_text])
+            maker_zip_btn.upload(process_ref_zip, inputs=[maker_zip_btn], outputs=[maker_audio, maker_text])
+            maker_txt_btn.upload(process_ref_txt, inputs=[maker_txt_btn], outputs=[maker_text])
+            maker_clear_btn.click(lambda: (None, "", ""), outputs=[maker_audio, maker_text, maker_name])
+
+            def on_compile(audio, text, name):
+                """Wrapper: calls compile_role, yields status, returns file path."""
+                updates = []
+                status_msgs = []
+
+                def _cb(msg):
+                    status_msgs.append(msg)
+
+                yield gr.update(), f"Starting compilation for '{name}'..."
+                filepath, final_msg = compile_role(audio, text, name, status_callback=_cb)
+                log = "\n".join(status_msgs[-6:]) + "\n" + final_msg  # Show last 6 status lines
+                if filepath and os.path.exists(filepath):
+                    yield gr.update(value=filepath, visible=True), log
+                else:
+                    yield gr.update(visible=False), log
+
+            maker_compile_btn.click(
+                on_compile,
+                inputs=[maker_audio, maker_text, maker_name],
+                outputs=[maker_download, maker_status]
             )
 
     return demo

@@ -308,6 +308,100 @@ def clean_script(text):
     # Join with newline to preserve sentence boundaries for the SRT splitter
     return "\n".join(clean_parts)
 
+def load_qwen3tts(filepath):
+    """Load a pre-compiled .qwen3tts voice prompt from disk.
+    
+    The .qwen3tts file is a torch.save() of the voice_clone_prompt object
+    produced by model.create_voice_clone_prompt(). This allows skipping
+    the expensive re-processing of reference audio each session.
+    
+    Returns:
+        The voice_clone_prompt object, or None on failure.
+    """
+    if not filepath or not os.path.exists(filepath):
+        return None
+    try:
+        prompt = torch.load(filepath, map_location="cpu", weights_only=False)
+        print(f"✅ Loaded .qwen3tts: {os.path.basename(filepath)}")
+        return prompt
+    except Exception as e:
+        print(f"❌ Failed to load .qwen3tts '{filepath}': {e}")
+        return None
+
+
+def compile_role(audio_path, transcript, role_name, status_callback=None):
+    """Compile a reference audio + transcript into a portable .qwen3tts file.
+    
+    This replicates the 'Qwen3-TTS Prompt Manager' node from ComfyUI:
+    the voice embedding is extracted once and saved as a tensor file
+    that can be re-loaded instantly without repeating the reference audio step.
+    
+    Args:
+        audio_path: Path to reference audio file.
+        transcript: Transcript of the reference audio (improves quality).
+        role_name: Name used for the output filename (e.g. 'Natasha').
+        status_callback: Optional callable for status updates.
+    
+    Returns:
+        (filepath, status_message) — filepath is None on failure.
+    """
+    if not audio_path:
+        return None, "❌ Error: Reference audio is required."
+    
+    name = role_name.strip() if role_name and role_name.strip() else "unnamed"
+    
+    def _update(msg):
+        print(msg)
+        if status_callback:
+            status_callback(msg)
+    
+    try:
+        _update("Loading TTS model for compilation...")
+        model = None
+        for result in load_model("base"):
+            if isinstance(result, str):
+                _update(result)
+            else:
+                model = result
+        
+        if model is None:
+            return None, "❌ Model loading failed."
+        
+        _update(f"Extracting voice timbre for '{name}'...")
+        if transcript and transcript.strip():
+            prompt = model.create_voice_clone_prompt(
+                ref_audio=audio_path,
+                ref_text=transcript.strip(),
+                x_vector_only_mode=False
+            )
+        else:
+            try:
+                prompt = model.create_voice_clone_prompt(
+                    ref_audio=audio_path,
+                    x_vector_only_mode=False
+                )
+            except Exception:
+                prompt = model.create_voice_clone_prompt(
+                    ref_audio=audio_path,
+                    x_vector_only_mode=True
+                )
+        
+        # Save to outputs/ directory so it's accessible in Colab
+        os.makedirs("outputs/roles", exist_ok=True)
+        filename = f"{name}.qwen3tts"
+        filepath = os.path.join("outputs/roles", filename)
+        
+        torch.save(prompt, filepath)
+        msg = f"✅ Compiled '{filename}' successfully! ({os.path.getsize(filepath) / 1024:.1f} KB)"
+        _update(msg)
+        return filepath, msg
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return None, f"❌ Compilation failed: {str(e)}"
+
+
 def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
                 temperature=0.8, top_p=0.9, repetition_penalty=1.1,
                 subtalker_temperature=0.8, status_callback=None):
@@ -343,29 +437,47 @@ def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
             name = role.get('name', '').strip()
             audio = role.get('audio')
             ref_text = role.get('text', '').strip()
+            qwen3tts_path = role.get('qwen3tts_path')  # Pre-compiled voice file
             
-            if not audio: continue
+            prompt = None
             
-            msg = f"Creating prompt for {name if name else 'Default'}..."
-            if status_callback: status_callback(msg)
-            yield msg
+            # --- Path A: Load from pre-compiled .qwen3tts file ---
+            if qwen3tts_path:
+                msg = f"Loading pre-compiled voice for '{name if name else 'Default'}'..."
+                if status_callback: status_callback(msg)
+                yield msg
+                prompt = load_qwen3tts(qwen3tts_path)
+                if prompt is None:
+                    msg = f"⚠️ Could not load '{qwen3tts_path}', falling back to reference audio..."
+                    if status_callback: status_callback(msg)
+                    yield msg
             
-            if ref_text:
-                prompt = model.create_voice_clone_prompt(ref_audio=audio, ref_text=ref_text, x_vector_only_mode=False)
-            else:
-                try:
-                    prompt = model.create_voice_clone_prompt(ref_audio=audio, x_vector_only_mode=False)
-                except:
-                    prompt = model.create_voice_clone_prompt(ref_audio=audio, x_vector_only_mode=True)
+            # --- Path B: Create from reference audio (original behaviour) ---
+            if prompt is None:
+                if not audio: continue
+                
+                msg = f"Creating prompt for {name if name else 'Default'}..."
+                if status_callback: status_callback(msg)
+                yield msg
+                
+                if ref_text:
+                    prompt = model.create_voice_clone_prompt(ref_audio=audio, ref_text=ref_text, x_vector_only_mode=False)
+                else:
+                    try:
+                        prompt = model.create_voice_clone_prompt(ref_audio=audio, x_vector_only_mode=False)
+                    except Exception:
+                        prompt = model.create_voice_clone_prompt(ref_audio=audio, x_vector_only_mode=True)
             
-            if name:
-                role_prompts[name] = prompt
-            if first_prompt is None:
-                first_prompt = prompt
+            if prompt is not None:
+                if name:
+                    role_prompts[name] = prompt
+                if first_prompt is None:
+                    first_prompt = prompt
 
         if not first_prompt:
-            yield "❌ No valid reference audio found."
+            yield "❌ No valid reference audio or .qwen3tts found."
             return
+
 
         # Phase 2: Parse Script and Generate
         # Pattern: ## Name ## Text
@@ -424,11 +536,16 @@ def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
                 content = raw_content.strip()
                 prompt = role_prompts.get(name, first_prompt)
                 
-                # Extract Emotion [tag]
-                emotion_match = re.match(r"^\s*\[(.*?)\]\s*(.*)", content, re.DOTALL)
-                if emotion_match:
-                    instr = emotion_match.group(1)
-                    actual_text = emotion_match.group(2)
+                # Extract ALL leading instruct/emotion tags: [Confident] [Professional] etc.
+                # Collects every consecutive [tag] at the start, joins as comma list for instruct param.
+                leading_tags = re.findall(r"^\s*(?:\[([^\]]+)\]\s*)+", content)
+                if leading_tags:
+                    # Re-parse individually to get each tag separately
+                    all_leading = re.findall(r"\[([^\]]+)\]", re.match(r"^(\s*\[[^\]]+\]\s*)+", content).group(0))
+                    instr = ", ".join(tag.strip() for tag in all_leading)
+                    # Strip all leading [tag] blocks from spoken text
+                    actual_text = re.sub(r"^(\s*\[[^\]]+\]\s*)+", "", content).strip()
+                    print(f"   🎭 Speaker '{name}' | instruct='{instr}'")
                 else:
                     instr = "Standard"
                     actual_text = content
