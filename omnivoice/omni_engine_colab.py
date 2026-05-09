@@ -127,7 +127,9 @@ def voice_clone(text, reference_audio, ref_transcript):
         gen_time = time.time() - gen_start
 
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-        sf.write(temp_file.name, wavs[0], sr)
+        # Ensure audio is on CPU and in numpy format for soundfile
+        audio_data = wavs[0].cpu().numpy() if torch.is_tensor(wavs[0]) else wavs[0]
+        sf.write(temp_file.name, audio_data, sr)
 
         total_time = time.time() - total_start
         audio_duration = len(wavs[0]) / sr
@@ -175,7 +177,9 @@ def custom_voice(text, voice_name, instruction):
         gen_time = time.time() - gen_start
 
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-        sf.write(temp_file.name, wavs[0], sr)
+        # Ensure audio is on CPU and in numpy format for soundfile
+        audio_data = wavs[0].cpu().numpy() if torch.is_tensor(wavs[0]) else wavs[0]
+        sf.write(temp_file.name, audio_data, sr)
 
         total_time = time.time() - total_start
         audio_duration = len(wavs[0]) / sr
@@ -216,7 +220,9 @@ def voice_design(text, voice_description):
         gen_time = time.time() - gen_start
 
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-        sf.write(temp_file.name, wavs[0], sr)
+        # Ensure audio is on CPU and in numpy format for soundfile
+        audio_data = wavs[0].cpu().numpy() if torch.is_tensor(wavs[0]) else wavs[0]
+        sf.write(temp_file.name, audio_data, sr)
 
         total_time = time.time() - total_start
         audio_duration = len(wavs[0]) / sr
