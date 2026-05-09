@@ -68,8 +68,11 @@ def create_app():
                     clone_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
                     clone_output = gr.Audio(label="Generated Speech")
-                    clone_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    clone_status = gr.Textbox(label="Status", value="", interactive=False, lines=2)
+                    with gr.Group():
+                        clone_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    gr.HTML("<br>")
+                    with gr.Group():
+                        clone_status = gr.Textbox(label="Status", value="", interactive=False, lines=2)
                     clone_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
 
             # Transcription handler
@@ -183,8 +186,11 @@ def create_app():
                     custom_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
                     custom_output = gr.Audio(label="Generated Speech")
-                    custom_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    custom_status = gr.Textbox(label="Status", value="", interactive=False, lines=2)
+                    with gr.Group():
+                        custom_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    gr.HTML("<br>")
+                    with gr.Group():
+                        custom_status = gr.Textbox(label="Status", value="", interactive=False, lines=2)
                     custom_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
 
             def on_custom(text, name, instr, gen_srt, conv_punc):
@@ -240,8 +246,11 @@ def create_app():
                     design_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
                     design_output = gr.Audio(label="Generated Speech")
-                    design_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    design_status = gr.Textbox(label="Status", value="", interactive=False, lines=2)
+                    with gr.Group():
+                        design_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    gr.HTML("<br>")
+                    with gr.Group():
+                        design_status = gr.Textbox(label="Status", value="", interactive=False, lines=2)
                     design_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
 
             def on_design(text, desc, gen_srt, conv_punc):
