@@ -67,9 +67,9 @@ def create_app():
 
                     clone_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
-                    clone_status = gr.Markdown("### 🕒 Status: Ready", elem_classes="status-msg")
                     clone_output = gr.Audio(label="Generated Speech")
                     clone_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    clone_status = gr.Textbox(label="Status", value="Ready", interactive=False, lines=2)
                     clone_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
 
             # Transcription handler
@@ -130,11 +130,11 @@ def create_app():
                 tts_dur = time.time() - tts_start
                 
                 if not audio_path:
-                    yield None, "### 🕒 Status: ❌ Generation failed.", gr.update(visible=False)
+                    yield None, "❌ Generation failed.", gr.update(visible=False)
                     return
                 
                 # Show audio immediately
-                yield audio_path, "### 🕒 Status: ⏳ Audio ready. Aligning subtitles...", gr.update(visible=False)
+                yield audio_path, "⏳ Audio ready. Aligning subtitles...", gr.update(visible=False)
                 
                 # Phase 2: Subtitles (Memory Intensive)
                 asr_start = time.time()
@@ -150,7 +150,7 @@ def create_app():
                 audio_data, sr = sf.read(audio_path)
                 audio_dur = len(audio_data) / sr
                 
-                perf_msg = f"### ✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Audio: {audio_dur:.1f}s"
+                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Audio: {audio_dur:.1f}s"
                 
                 zip_path = package_zip(text, audio_path, srt)
                 yield audio_path, srt, gr.update(value=zip_path, visible=True), perf_msg
@@ -178,9 +178,9 @@ def create_app():
                         
                     custom_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
-                    custom_status = gr.Markdown("### 🕒 Status: Ready", elem_classes="status-msg")
                     custom_output = gr.Audio(label="Generated Speech")
                     custom_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    custom_status = gr.Textbox(label="Status", value="Ready", interactive=False, lines=2)
                     custom_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
 
             def on_custom(text, name, instr, gen_srt, conv_punc):
@@ -192,10 +192,10 @@ def create_app():
                 tts_dur = time.time() - tts_start
                 
                 if not audio_path:
-                    yield None, "### 🕒 Status: ❌ Generation failed.", gr.update(visible=False)
+                    yield None, "❌ Generation failed.", gr.update(visible=False)
                     return
                 
-                yield audio_path, "### 🕒 Status: ⏳ Audio ready. Aligning subtitles...", gr.update(visible=False)
+                yield audio_path, "⏳ Audio ready. Aligning subtitles...", gr.update(visible=False)
                 
                 # Phase 2: SRT
                 asr_start = time.time()
@@ -209,7 +209,7 @@ def create_app():
                 import soundfile as sf
                 audio_data, sr = sf.read(audio_path)
                 audio_dur = len(audio_data) / sr
-                perf_msg = f"### ✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Audio: {audio_dur:.1f}s"
+                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Audio: {audio_dur:.1f}s"
                     
                 zip_path = package_zip(text, audio_path, srt)
                 yield audio_path, srt, gr.update(value=zip_path, visible=True), perf_msg
@@ -229,9 +229,9 @@ def create_app():
                         
                     design_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
-                    design_status = gr.Markdown("### 🕒 Status: Ready", elem_classes="status-msg")
                     design_output = gr.Audio(label="Generated Speech")
                     design_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    design_status = gr.Textbox(label="Status", value="Ready", interactive=False, lines=2)
                     design_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
 
             def on_design(text, desc, gen_srt, conv_punc):
@@ -243,10 +243,10 @@ def create_app():
                 tts_dur = time.time() - tts_start
                 
                 if not audio_path:
-                    yield None, "### 🕒 Status: ❌ Generation failed.", gr.update(visible=False)
+                    yield None, "❌ Generation failed.", gr.update(visible=False)
                     return
                 
-                yield audio_path, "### 🕒 Status: ⏳ Audio ready. Aligning subtitles...", gr.update(visible=False)
+                yield audio_path, "⏳ Audio ready. Aligning subtitles...", gr.update(visible=False)
                 
                 # Phase 2: SRT
                 asr_start = time.time()
@@ -260,7 +260,7 @@ def create_app():
                 import soundfile as sf
                 audio_data, sr = sf.read(audio_path)
                 audio_dur = len(audio_data) / sr
-                perf_msg = f"### ✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Audio: {audio_dur:.1f}s"
+                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Audio: {audio_dur:.1f}s"
                     
                 zip_path = package_zip(text, audio_path, srt)
                 yield audio_path, srt, gr.update(value=zip_path, visible=True), perf_msg
