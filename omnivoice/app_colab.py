@@ -56,44 +56,44 @@ def package_zip(text, audio_path, srt_content):
 def create_app():
     with gr.Blocks(title="Qwen3-TTS", css=custom_css) as demo:
         # Main Title
-        gr.Markdown("# 🎙️ Qwen3-TTS")
+        gr.Markdown("# Qwen3-TTS")
         gr.Markdown("Advanced Text-to-Speech AI | Voice Cloning, Custom Voice & Voice Design")
 
-        with gr.Tab("Voice Cloning (Multi-Speaker)"):
-            with gr.Row():
-                with gr.Column(scale=1):
-                    gr.Markdown("### 🎭 Role Bank")
-                    with gr.Group():
-                        gr.Markdown("#### Role 1 (Primary)")
-                        r1_name = gr.Textbox(label="Role Name", placeholder="e.g. Alex", value="")
-                        r1_audio = gr.Audio(label="Reference Audio", type="filepath")
-                        r1_text = gr.Textbox(label="Reference Transcript", placeholder="Text from the audio...")
-                    
-                    with gr.Accordion("🎭 Role 2", open=False):
-                        r2_name = gr.Textbox(label="Role Name", placeholder="e.g. Sara")
-                        r2_audio = gr.Audio(label="Reference Audio", type="filepath")
-                        r2_text = gr.Textbox(label="Reference Transcript", placeholder="Text from the audio...")
-                        
-                    with gr.Accordion("🎭 Role 3", open=False):
-                        r3_name = gr.Textbox(label="Role Name", placeholder="e.g. Bob")
-                        r3_audio = gr.Audio(label="Reference Audio", type="filepath")
-                        r3_text = gr.Textbox(label="Reference Transcript", placeholder="Text from the audio...")
+        with gr.Tab("Voice Cloning"):
+            # Utility functions for roles
+            def on_transcribe(audio):
+                if not audio: return ""
+                return transcribe_ref(audio)
 
-                with gr.Column(scale=1):
-                    gr.Markdown("### 📜 Script")
-                    input_text = gr.Textbox(
-                        label="Input Text", 
-                        placeholder="## Alex ## [shout] Hello! [pause:0.5] How are you?\n## Sara ## [happy] I'm fine!", 
-                        lines=15
-                    )
-                    with gr.Row():
-                        gen_srt = gr.Checkbox(label="Generate Subtitles", value=True)
-                        conv_punc = gr.Checkbox(label="Smart Punctuation", value=True)
-                    btn = gr.Button("🚀 Generate Audio", variant="primary")
-                    audio_out = gr.Audio(label="Generated Speech")
-                    srt_out = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    status_out = gr.Textbox(label="Status", value="", interactive=False, lines=2)
-                    zip_out = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
+            def process_ref_zip(zip_file):
+                if not zip_file: return None, ""
+                import zipfile, tempfile
+                audio_path = None
+                text_content = ""
+                tmp = tempfile.mkdtemp()
+                with zipfile.ZipFile(zip_file.name, 'r') as z:
+                    z.extractall(tmp)
+                    for f in z.namelist():
+                        if f.endswith(('.wav', '.mp3', '.flac')) and not f.startswith('__MACOSX') and not os.path.basename(f).startswith('.'):
+                            audio_path = os.path.join(tmp, f)
+                        if f.endswith('.txt') and not f.startswith('__MACOSX') and not os.path.basename(f).startswith('.'):
+                            txt_path = os.path.join(tmp, f)
+                            try:
+                                with open(txt_path, 'r', encoding='utf-8') as tf:
+                                    text_content = tf.read()
+                            except UnicodeDecodeError:
+                                with open(txt_path, 'r', encoding='gbk') as tf:
+                                    text_content = tf.read()
+                return audio_path, text_content
+
+            def process_ref_txt(txt_file):
+                if not txt_file: return ""
+                try:
+                    with open(txt_file.name, 'r', encoding='utf-8') as tf:
+                        return tf.read()
+                except UnicodeDecodeError:
+                    with open(txt_file.name, 'r', encoding='gbk') as tf:
+                        return tf.read()
 
             def on_clone(text, 
                          name1, audio1, text1, 
@@ -103,7 +103,7 @@ def create_app():
                 import time
                 start_time = time.time()
                 # Clear previous outputs immediately
-                yield None, "", gr.update(visible=False), "⏳ Initializing..."
+                yield None, "", gr.update(visible=False), "Initializing..."
                 
                 # Build role bank data
                 role_bank_data = []
@@ -124,12 +124,11 @@ def create_app():
                 tts_dur = time.time() - tts_start
                 
                 if not audio_path:
-                    if not last_status.startswith("❌"):
-                        yield None, gr.update(), gr.update(visible=False), "❌ Generation failed."
+                    if not last_status.startswith("Error") and not last_status.startswith("❌"):
+                        yield None, gr.update(), gr.update(visible=False), "Generation failed."
                     return
                 
-                # Show audio immediately
-                yield audio_path, gr.update(), gr.update(visible=False), "⏳ Audio ready. Aligning subtitles..."
+                yield audio_path, gr.update(), gr.update(visible=False), "Audio ready. Aligning subtitles..."
                 
                 # Phase 2: Subtitles (Memory Intensive)
                 asr_start = time.time()
@@ -146,10 +145,76 @@ def create_app():
                 # Performance metrics
                 total_dur = time.time() - start_time
                 word_count = count_words(text)
-                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {word_count}"
+                perf_msg = f"Done! Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {word_count}"
                 
                 zip_path = package_zip(text, audio_path, srt)
                 yield audio_path, srt, gr.update(value=zip_path, visible=True), perf_msg
+
+            # --- Layout ---
+            input_text = gr.Textbox(
+                label="Input Text", 
+                placeholder="## Alex ## [shout] Hello! [pause:0.5] How are you?\n## Sara ## [happy] I'm fine!", 
+                lines=6
+            )
+            
+            with gr.Row():
+                with gr.Column():
+                    with gr.Group():
+                        gr.Markdown("#### Role 1 (Primary)")
+                        r1_name = gr.Textbox(label="Role Name", placeholder="e.g. Alex", value="")
+                        r1_audio = gr.Audio(label="Reference Audio", type="filepath")
+                        r1_text = gr.Textbox(label="Reference Transcript", placeholder="Text from the audio...")
+                        with gr.Row():
+                            r1_trans_btn = gr.Button("Trans Ref", variant="secondary", size="sm")
+                            r1_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="secondary", size="sm")
+                            r1_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="secondary", size="sm")
+                    
+                    with gr.Accordion("Role 2", open=False):
+                        r2_name = gr.Textbox(label="Role Name", placeholder="e.g. Sara")
+                        r2_audio = gr.Audio(label="Reference Audio", type="filepath")
+                        r2_text = gr.Textbox(label="Reference Transcript", placeholder="Text from the audio...")
+                        with gr.Row():
+                            r2_trans_btn = gr.Button("Trans Ref", variant="secondary", size="sm")
+                            r2_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="secondary", size="sm")
+                            r2_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="secondary", size="sm")
+                        
+                    with gr.Accordion("Role 3", open=False):
+                        r3_name = gr.Textbox(label="Role Name", placeholder="e.g. Bob")
+                        r3_audio = gr.Audio(label="Reference Audio", type="filepath")
+                        r3_text = gr.Textbox(label="Reference Transcript", placeholder="Text from the audio...")
+                        with gr.Row():
+                            r3_trans_btn = gr.Button("Trans Ref", variant="secondary", size="sm")
+                            r3_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="secondary", size="sm")
+                            r3_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="secondary", size="sm")
+
+                with gr.Column():
+                    with gr.Group():
+                        audio_out = gr.Audio(label="Generated Speech")
+                    with gr.Group():
+                        srt_out = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    with gr.Group():
+                        status_out = gr.Textbox(label="Status", value="", interactive=False, lines=2)
+                    with gr.Row():
+                        gen_srt = gr.Checkbox(label="Generate Subtitles", value=True)
+                        conv_punc = gr.Checkbox(label="Smart Punctuation", value=True)
+                    btn = gr.Button("Generate Audio", variant="primary", size="lg")
+                    zip_out = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
+
+            # --- Callbacks ---
+            # Role 1
+            r1_trans_btn.click(on_transcribe, inputs=[r1_audio], outputs=[r1_text])
+            r1_zip_btn.upload(process_ref_zip, inputs=[r1_zip_btn], outputs=[r1_audio, r1_text])
+            r1_txt_btn.upload(process_ref_txt, inputs=[r1_txt_btn], outputs=[r1_text])
+            
+            # Role 2
+            r2_trans_btn.click(on_transcribe, inputs=[r2_audio], outputs=[r2_text])
+            r2_zip_btn.upload(process_ref_zip, inputs=[r2_zip_btn], outputs=[r2_audio, r2_text])
+            r2_txt_btn.upload(process_ref_txt, inputs=[r2_txt_btn], outputs=[r2_text])
+            
+            # Role 3
+            r3_trans_btn.click(on_transcribe, inputs=[r3_audio], outputs=[r3_text])
+            r3_zip_btn.upload(process_ref_zip, inputs=[r3_zip_btn], outputs=[r3_audio, r3_text])
+            r3_txt_btn.upload(process_ref_txt, inputs=[r3_txt_btn], outputs=[r3_text])
 
             btn.click(
                 on_clone,
@@ -158,35 +223,32 @@ def create_app():
             )
 
         with gr.Tab("Custom Voice"):
-            gr.Markdown("### Use 9 preset character voices with style control")
             with gr.Row():
                 with gr.Column():
-                    custom_text = gr.Textbox(label="Text to Synthesize", placeholder="Enter text...", lines=4)
-                    custom_voice_name = gr.Dropdown(
-                        choices=["serena", "vivian", "ono_anna", "sohee", "aiden", "dylan", "eric", "ryan", "uncle_fu"],
-                        label="Voice Character", value="serena"
+                    custom_text = gr.Textbox(label="Input Text", placeholder="Enter text...", lines=6)
+                    custom_name = gr.Dropdown(
+                        label="Character Voice", 
+                        choices=["amanda", "denis", "jessica", "kevin", "lewis", "pippa", "stella", "tess", "vivienne"],
+                        value="amanda"
                     )
-                    custom_instruction = gr.Textbox(label="Style Instruction (Optional)", placeholder="e.g., 'speak slowly and cheerfully'", lines=2)
-                    
-                    with gr.Accordion("Advanced Settings", open=False):
+                    custom_instr = gr.Textbox(label="Instruction", placeholder="e.g. happy, sad, whispered, shouting...", value="Standard")
+                    with gr.Row():
                         custom_gen_srt = gr.Checkbox(label="Generate Subtitles", value=True)
-                        custom_conv_punc = gr.Checkbox(label="Convert Punctuation", value=True)
-                        
-                    custom_btn = gr.Button("Generate Speech", variant="primary", size="lg")
+                        custom_conv_punc = gr.Checkbox(label="Smart Punctuation", value=True)
+                    custom_btn = gr.Button("Generate Audio", variant="primary", size="lg")
                 with gr.Column():
-                    custom_output = gr.Audio(label="Generated Speech")
+                    custom_audio = gr.Audio(label="Generated Speech")
                     with gr.Group():
-                        custom_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-
+                        custom_srt = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
                     with gr.Group():
-                        custom_status = gr.Textbox(label="Status", value="", interactive=False, lines=2)
-                    custom_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
+                        custom_status = gr.Textbox(label="Status", interactive=False, lines=2)
+                    custom_zip = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
             def on_custom(text, name, instr, gen_srt, conv_punc):
                 import time
                 start_time = time.time()
                 # Clear previous outputs
-                yield None, "", gr.update(visible=False), "⏳ Initializing..."
+                yield None, "", gr.update(visible=False), "Initializing..."
                 
                 # Phase 1: Audio
                 tts_start = time.time()
@@ -202,11 +264,11 @@ def create_app():
                 tts_dur = time.time() - tts_start
                 
                 if not audio_path:
-                    if not last_status.startswith("❌"):
-                        yield None, gr.update(), gr.update(visible=False), "❌ Generation failed."
+                    if not last_status.startswith("Error"):
+                        yield None, gr.update(), gr.update(visible=False), "Generation failed."
                     return
                 
-                yield audio_path, gr.update(), gr.update(visible=False), "⏳ Audio ready. Aligning subtitles..."
+                yield audio_path, gr.update(), gr.update(visible=False), "Audio ready. Aligning subtitles..."
                 
                 # Phase 2: SRT
                 asr_start = time.time()
@@ -222,39 +284,43 @@ def create_app():
                 
                 total_dur = time.time() - start_time
                 word_count = count_words(text)
-                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {word_count}"
+                perf_msg = f"Done! Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {word_count}"
                     
                 zip_path = package_zip(text, audio_path, srt)
                 yield audio_path, srt, gr.update(value=zip_path, visible=True), perf_msg
 
-            custom_btn.click(on_custom, inputs=[custom_text, custom_voice_name, custom_instruction, custom_gen_srt, custom_conv_punc], outputs=[custom_output, custom_srt_preview, custom_zip_dl, custom_status])
+            custom_btn.click(
+                on_custom,
+                inputs=[custom_text, custom_name, custom_instr, custom_gen_srt, custom_conv_punc],
+                outputs=[custom_audio, custom_srt, custom_zip, custom_status]
+            )
 
         with gr.Tab("Voice Design"):
-            gr.Markdown("### Design a unique voice from text description")
             with gr.Row():
                 with gr.Column():
-                    design_text = gr.Textbox(label="Text to Synthesize", placeholder="Enter text...", lines=4)
-                    design_description = gr.Textbox(label="Voice Description", placeholder="A young female, cheerful, speaking clearly", lines=4)
-                    
-                    with gr.Accordion("Advanced Settings", open=False):
+                    design_text = gr.Textbox(label="Input Text", placeholder="Enter text...", lines=6)
+                    design_desc = gr.Textbox(
+                        label="Voice Description", 
+                        placeholder="e.g. A middle-aged man with a deep, raspy voice and a calm tone.",
+                        lines=3
+                    )
+                    with gr.Row():
                         design_gen_srt = gr.Checkbox(label="Generate Subtitles", value=True)
-                        design_conv_punc = gr.Checkbox(label="Convert Punctuation", value=True)
-                        
-                    design_btn = gr.Button("Generate Speech", variant="primary", size="lg")
+                        design_conv_punc = gr.Checkbox(label="Smart Punctuation", value=True)
+                    design_btn = gr.Button("Generate Audio", variant="primary", size="lg")
                 with gr.Column():
-                    design_output = gr.Audio(label="Generated Speech")
+                    design_audio = gr.Audio(label="Generated Speech")
                     with gr.Group():
-                        design_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-
+                        design_srt = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
                     with gr.Group():
-                        design_status = gr.Textbox(label="Status", value="", interactive=False, lines=2)
-                    design_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
+                        design_status = gr.Textbox(label="Status", interactive=False, lines=2)
+                    design_zip = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
             def on_design(text, desc, gen_srt, conv_punc):
                 import time
                 start_time = time.time()
                 # Clear previous outputs
-                yield None, "", gr.update(visible=False), "⏳ Initializing..."
+                yield None, "", gr.update(visible=False), "Initializing..."
                 
                 # Phase 1: Audio
                 tts_start = time.time()
@@ -270,11 +336,11 @@ def create_app():
                 tts_dur = time.time() - tts_start
                 
                 if not audio_path:
-                    if not last_status.startswith("❌"):
-                        yield None, gr.update(), gr.update(visible=False), "❌ Generation failed."
+                    if not last_status.startswith("Error"):
+                        yield None, gr.update(), gr.update(visible=False), "Generation failed."
                     return
                 
-                yield audio_path, gr.update(), gr.update(visible=False), "⏳ Audio ready. Aligning subtitles..."
+                yield audio_path, gr.update(), gr.update(visible=False), "Audio ready. Aligning subtitles..."
                 
                 # Phase 2: SRT
                 asr_start = time.time()
@@ -290,12 +356,16 @@ def create_app():
                 
                 total_dur = time.time() - start_time
                 word_count = count_words(text)
-                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {word_count}"
+                perf_msg = f"Done! Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {word_count}"
                     
                 zip_path = package_zip(text, audio_path, srt)
                 yield audio_path, srt, gr.update(value=zip_path, visible=True), perf_msg
 
-            design_btn.click(on_design, inputs=[design_text, design_description, design_gen_srt, design_conv_punc], outputs=[design_output, design_srt_preview, design_zip_dl, design_status])
+            design_btn.click(
+                on_design,
+                inputs=[design_text, design_desc, design_gen_srt, design_conv_punc],
+                outputs=[design_audio, design_srt, design_zip, design_status]
+            )
 
     return demo
 
