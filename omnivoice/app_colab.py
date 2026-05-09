@@ -67,25 +67,42 @@ def create_app():
 
             def process_ref_zip(zip_file):
                 if not zip_file: return None, ""
-                import zipfile, shutil
-                os.makedirs("outputs/refs", exist_ok=True)
+                import zipfile, shutil, uuid
+                out_dir = os.path.abspath("outputs/refs")
+                os.makedirs(out_dir, exist_ok=True)
                 audio_path = None
                 text_content = ""
                 
                 with zipfile.ZipFile(zip_file.name, 'r') as z:
                     for f in z.namelist():
-                        if f.endswith(('.wav', '.mp3', '.flac')) and not f.startswith('__MACOSX') and not os.path.basename(f).startswith('.'):
-                            filename = os.path.basename(f)
-                            dest = os.path.join("outputs/refs", filename)
-                            with z.open(f) as source, open(dest, "wb") as target:
+                        if f.endswith('/') or f.startswith('__MACOSX') or os.path.basename(f).startswith('.'):
+                            continue
+                            
+                        # Unique prefix to avoid collisions and Gradio cache issues
+                        unique_prefix = str(uuid.uuid4())[:8]
+                        
+                        if f.lower().endswith(('.wav', '.mp3', '.flac')):
+                            ext = os.path.splitext(f)[1]
+                            dest_name = f"{unique_prefix}_{os.path.basename(f)}"
+                            dest_path = os.path.join(out_dir, dest_name)
+                            
+                            # Extract and move
+                            with z.open(f) as source, open(dest_path, "wb") as target:
                                 shutil.copyfileobj(source, target)
-                            audio_path = dest
-                        if f.endswith('.txt') and not f.startswith('__MACOSX') and not os.path.basename(f).startswith('.'):
+                            
+                            if os.path.exists(dest_path) and os.path.getsize(dest_path) > 0:
+                                audio_path = dest_path
+                                
+                        if f.lower().endswith('.txt'):
                             with z.open(f) as tf:
                                 try:
                                     text_content = tf.read().decode('utf-8')
                                 except:
-                                    text_content = tf.read().decode('gbk', errors='ignore')
+                                    try:
+                                        text_content = tf.read().decode('gbk', errors='ignore')
+                                    except:
+                                        text_content = ""
+                
                 return audio_path, text_content
 
             def process_ref_txt(txt_file):
