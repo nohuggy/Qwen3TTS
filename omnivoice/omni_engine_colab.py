@@ -4,6 +4,8 @@ import time
 import soundfile as sf
 import tempfile
 import os
+import re
+import difflib
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 from qwen_tts import Qwen3TTSModel
 
@@ -139,6 +141,115 @@ def unify_punctuation(text):
     for old, new in replacements.items():
         text = text.replace(old, new)
     return text
+
+def smart_balanced_split(text, target_words=10, max_words=15):
+    """Split original text into readable segments for subtitles"""
+    if not text: return []
+    # Split into paragraphs first
+    paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
+    all_segments = []
+    
+    for p_text in paragraphs:
+        p_text = re.sub(r'\s+', ' ', p_text).strip()
+        # Pattern captures tokens with surrounding punctuation
+        pattern = re.compile(r'([^\w\s\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]*)([\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]|[a-zA-Z0-9-]+)([^\w\s\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af\(\[\{\u300c\u300e\u300a\u3008\u201c\u2018\uFF08]*)(\s*)')
+        tokens = []
+        for match in pattern.finditer(p_text):
+            lead_punct, word, trail_punct, space = match.groups()
+            tokens.append(lead_punct + word + trail_punct + space)
+        
+        if not tokens: continue
+
+        def split_recursive(tkns):
+            if len(tkns) <= max_words:
+                return ["".join(tkns).strip()]
+            n = max(2, round(len(tkns) / target_words))
+            avg = len(tkns) / n
+            ideal_end = int(avg)
+            best_break = ideal_end
+            min_p = 1000
+            for offset in range(-6, 7):
+                idx = ideal_end + offset
+                if idx <= 0 or idx >= len(tkns): continue
+                p_orphan = 100 if (idx < 3 or (len(tkns) - idx) < 3) else 0
+                t = tkns[idx - 1]
+                p = abs(offset) * 4 + p_orphan
+                if any(x in t for x in "。！？.!?;；…"): p -= 80
+                elif any(x in t for x in "，,"): p -= 40
+                elif any(x in t for x in "”’」』"): p -= 20
+                else: p += 40
+                if p < min_p:
+                    min_p = p
+                    best_break = idx
+            return split_recursive(tkns[:best_break]) + split_recursive(tkns[best_break:])
+
+        all_segments.extend(split_recursive(tokens))
+    return all_segments
+
+def align_robust(user_segments, aligner_tokens):
+    """Align user-provided text segments to aligner timestamps"""
+    user_clean = [re.sub(r'[^\w\u4e00-\u9fff]', '', s).lower() for s in user_segments]
+    
+    # Create mapping of clean aligner chars to timestamps
+    char_times = []
+    for c in aligner_tokens:
+        txt = c.text
+        s, e = c.start_time, c.end_time
+        c_clean = re.sub(r'[^\w\u4e00-\u9fff]', '', txt).lower()
+        if not c_clean: continue
+        duration = e - s
+        for i in range(len(c_clean)):
+            char_times.append((s + (i / len(c_clean)) * duration, s + ((i + 1) / len(c_clean)) * duration))
+            
+    user_full_clean = "".join(user_clean)
+    aligner_clean = "".join([re.sub(r'[^\w\u4e00-\u9fff]', '', c.text).lower() for c in aligner_tokens])
+    matcher = difflib.SequenceMatcher(None, user_full_clean, aligner_clean)
+    
+    mapping = [None] * len(user_full_clean)
+    for u_s, w_s, length in matcher.get_matching_blocks():
+        for i in range(length):
+            if w_s + i < len(char_times):
+                mapping[u_s + i] = char_times[w_s + i]
+                
+    matched_indices = [i for i, x in enumerate(mapping) if x is not None]
+    if not matched_indices:
+        total_dur = char_times[-1][1] if char_times else 10.0
+        for i in range(len(mapping)):
+            mapping[i] = ((i / len(mapping)) * total_dur, ((i + 1) / len(mapping)) * total_dur)
+    else:
+        # Simple interpolation for gaps
+        first_idx = matched_indices[0]
+        first_s = mapping[first_idx][0]
+        for i in range(first_idx):
+            mapping[i] = ((i / first_idx) * first_s, ((i + 1) / first_idx) * first_s)
+            
+        for j in range(len(matched_indices) - 1):
+            idx1, idx2 = matched_indices[j], matched_indices[j+1]
+            t1, t2 = mapping[idx1][1], mapping[idx2][0]
+            gap_len = idx2 - idx1 - 1
+            if gap_len > 0:
+                for k in range(1, gap_len + 1):
+                    mapping[idx1 + k] = (t1 + ((k-1)/gap_len)*(t2-t1), t1 + (k/gap_len)*(t2-t1))
+                    
+        last_idx = matched_indices[-1]
+        last_e = mapping[last_idx][1]
+        total_end = char_times[-1][1] if char_times else last_e + 2.0
+        rem_len = len(mapping) - 1 - last_idx
+        if rem_len > 0:
+            for k in range(1, rem_len + 1):
+                mapping[last_idx + k] = (last_e + ((k-1)/rem_len)*(total_end-last_e), last_e + (k/rem_len)*(total_end-last_e))
+        
+    results = []
+    curr = 0
+    for s_clean in user_clean:
+        if not s_clean:
+            results.append((results[-1][1] if results else 0.0, (results[-1][1] if results else 0.0) + 1.0))
+            continue
+        start_t = mapping[curr][0]
+        end_t = mapping[curr + len(s_clean) - 1][1]
+        results.append((start_t, end_t))
+        curr += len(s_clean)
+    return results
 
 def voice_clone(text, reference_audio, ref_transcript, gen_srt=False, convert_punc=False):
     """Generate speech by cloning a reference voice"""
@@ -465,15 +576,18 @@ def unload_aligner():
             torch.cuda.empty_cache()
 
 def generate_srt(text, audio_path):
-    """Generate SRT subtitles using Forced Aligner"""
+    """Generate SRT subtitles using Forced Aligner and Robust Splitter"""
     if not text or not audio_path:
         return ""
     try:
         model = get_aligner_pipe()
         if model is None: return ""
         
-        print("🔍 Generating subtitles (Forced Aligner)...")
-        # For alignment, we provide the reference text
+        print("🔍 Generating subtitles (Forced Aligner + Robust Mapping)...")
+        # Step 1: Split original text into balanced segments
+        user_segments = smart_balanced_split(text)
+        
+        # Step 2: Get word-level alignment from model
         results = model.transcribe(
             audio=audio_path,
             context=text,
@@ -484,27 +598,18 @@ def generate_srt(text, audio_path):
             print("⚠️ No timestamps generated.")
             return ""
         
-        srt_content = ""
-        # Group word-level timestamps into readable segments
-        # Qwen3-ASR returns a list of Timestamp objects
-        ts = results[0].time_stamps
+        # Step 3: Align original segments to timestamps
+        aligned = align_robust(user_segments, results[0].time_stamps)
         
-        # Simple grouping: 10 words per line
-        words_per_line = 10
-        for i in range(0, len(ts), words_per_line):
-            chunk = ts[i:i+words_per_line]
-            start = format_timestamp(chunk[0].start_time)
-            end = format_timestamp(chunk[-1].end_time)
-            line_text = "".join([c.text for c in chunk]).strip()
-            srt_content += f"{(i//words_per_line)+1}\n{start} --> {end}\n{line_text}\n\n"
+        # Step 4: Format SRT
+        srt_content = ""
+        for i, ((start, end), segment_text) in enumerate(zip(aligned, user_segments)):
+            srt_content += f"{i+1}\n{format_timestamp(start)} --> {format_timestamp(end)}\n{segment_text}\n\n"
         
         print("✅ SRT generated successfully")
-        # Auto offload after task
         unload_aligner()
         return srt_content.strip()
     except Exception as e:
         print(f"❌ SRT Generation Error: {e}")
-        import traceback
-        traceback.print_exc()
         unload_aligner()
         return f"SRT Error: {e}"
