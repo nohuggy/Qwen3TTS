@@ -602,7 +602,9 @@ def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
         print(msg)
         yield msg
 
-def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=False, status_callback=None):
+def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=False,
+                 temperature=0.8, top_p=0.9, repetition_penalty=1.1,
+                 subtalker_temperature=0.8, status_callback=None):
     """Generate speech using preset voices with chunk awareness"""
     if not text:
         return None, ""
@@ -640,16 +642,22 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
                 yield msg
                 print(f"   {msg}")
                 
-                if instruction and instruction.strip():
+                instr_arg = instruction if (instruction and instruction.strip() and instruction.strip() != "Standard") else None
+                try:
                     wavs, sr = model.generate_custom_voice(
                         text=p,
                         speaker=voice_name,
-                        instruct=instruction
+                        instruct=instr_arg,
+                        temperature=temperature,
+                        top_p=top_p,
+                        repetition_penalty=repetition_penalty,
+                        subtalker_temperature=subtalker_temperature,
                     )
-                else:
+                except TypeError:
                     wavs, sr = model.generate_custom_voice(
                         text=p,
-                        speaker=voice_name
+                        speaker=voice_name,
+                        instruct=instr_arg,
                     )
                 wav = wavs[0]
                 if hasattr(wav, 'cpu'):
@@ -692,7 +700,9 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
         print(msg)
         yield msg
 
-def voice_design(text, voice_description, gen_srt=False, convert_punc=False, status_callback=None):
+def voice_design(text, voice_description, gen_srt=False, convert_punc=False,
+                 temperature=0.8, top_p=0.9, repetition_penalty=1.1,
+                 subtalker_temperature=0.8, status_callback=None):
     """Generate speech from text description with chunk awareness"""
     if not text or not voice_description:
         return None, ""
@@ -730,10 +740,20 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False, sta
                 yield msg
                 print(f"   {msg}")
                 
-                wavs, sr = model.generate_voice_design(
-                    text=p,
-                    instruct=voice_description
-                )
+                try:
+                    wavs, sr = model.generate_voice_design(
+                        text=p,
+                        instruct=voice_description,
+                        temperature=temperature,
+                        top_p=top_p,
+                        repetition_penalty=repetition_penalty,
+                        subtalker_temperature=subtalker_temperature,
+                    )
+                except TypeError:
+                    wavs, sr = model.generate_voice_design(
+                        text=p,
+                        instruct=voice_description
+                    )
                 wav = wavs[0]
                 if hasattr(wav, 'cpu'):
                     wav = wav.cpu()
