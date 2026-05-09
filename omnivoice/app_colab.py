@@ -25,29 +25,28 @@ custom_css = """
     margin-bottom: 8px;
     font-family: monospace;
 }
-.merged-row {
-    gap: 0 !important;
-    align-items: flex-end !important;
+/* Load Role button overlaid inside the Role Name textbox */
+.role-name-row {
+    position: relative !important;
 }
-/* Visual merger for Load Role button */
-.merged-row .gr-form {
-    border-top-right-radius: 0 !important;
-    border-bottom-right-radius: 0 !important;
-    border-right: none !important;
+.role-name-row > div:first-child {
+    flex: 1 !important;
 }
-.merged-row .gr-button {
-    border-top-left-radius: 0 !important;
-    border-bottom-left-radius: 0 !important;
-    border-left: none !important;
-    height: 42px !important;
-    margin-bottom: 0 !important;
-    min-width: 100px !important;
+.role-name-row > div:last-child {
+    position: absolute !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    z-index: 10 !important;
 }
-/* Ensure textbox internal borders are also removed */
-.merged-row .gr-form > div {
-    border-top-right-radius: 0 !important;
-    border-bottom-right-radius: 0 !important;
-    border-right: none !important;
+.role-name-row > div:last-child button {
+    font-size: 0.75rem !important;
+    padding: 4px 10px !important;
+    height: 28px !important;
+    min-width: auto !important;
+    opacity: 0.85;
+}
+.role-name-row > div:last-child button:hover {
+    opacity: 1;
 }
 """
 
@@ -193,10 +192,10 @@ def create_app():
 
                     def _role_panel(label, open_=True, name_ph="e.g. Alex"):
                         with gr.Accordion(label, open=open_):
-                            with gr.Row(variant="compact", elem_classes="merged-row"):
-                                rname = gr.Textbox(label="Role Name", placeholder=name_ph, value="", scale=4)
+                            with gr.Row(elem_classes="role-name-row"):
+                                rname = gr.Textbox(label="Role Name", placeholder=name_ph, value="")
                                 rload = gr.UploadButton("Load Role", file_types=[".qwen3tts"],
-                                                        variant="secondary", size="sm", scale=1)
+                                                        variant="secondary", size="sm")
                             
                             with gr.Column(visible=True) as extra_fields:
                                 raudio = gr.Audio(label="Reference Audio", type="filepath")
@@ -219,7 +218,6 @@ def create_app():
                 with gr.Column():
                     audio_out  = gr.Audio(label="Generated Speech")
                     srt_out    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    gr.HTML('<div style="height: 10px;"></div>')
                     status_out = gr.Textbox(label="Status", value="", interactive=False, lines=2)
                     temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc = _adv_accordion()
                     btn     = gr.Button("Generate Audio", variant="primary", size="lg")
@@ -264,7 +262,6 @@ def create_app():
                 with gr.Column():
                     custom_audio  = gr.Audio(label="Generated Speech")
                     custom_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    gr.HTML('<div style="height: 10px;"></div>')
                     custom_status = gr.Textbox(label="Status", interactive=False, lines=2)
                     custom_zip    = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
@@ -324,7 +321,6 @@ def create_app():
                 with gr.Column():
                     design_audio  = gr.Audio(label="Generated Speech")
                     design_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    gr.HTML('<div style="height: 10px;"></div>')
                     design_status = gr.Textbox(label="Status", interactive=False, lines=2)
                     design_zip    = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
