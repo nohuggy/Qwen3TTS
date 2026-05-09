@@ -693,6 +693,7 @@ def generate_srt(text, audio_path, total_start_time=None):
 
         yield get_msg("Loading Aligner Engine...")
         model = get_aligner_pipe()
+        yield get_msg("✅ Engine loaded. Starting alignment...")
         if model is None: 
             yield "❌ Aligner Engine failed to load."
             return

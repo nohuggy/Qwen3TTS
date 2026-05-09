@@ -3,6 +3,17 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["PYTHONWARNINGS"] = "ignore"
 import gradio as gr
 from omnivoice.omni_engine_colab import voice_clone, custom_voice, voice_design, transcribe_ref
+import time
+import re
+
+def count_words(text):
+    """Smart word count: CJK characters count as 1, Latin words count as 1"""
+    if not text: return 0
+    # Count CJK characters (Chinese, Japanese, Korean)
+    cjk_count = len(re.findall(r'[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]', text))
+    # Count non-CJK words (sequences of Latin letters/numbers)
+    latin_words = len(re.findall(r'[a-zA-Z0-9\']+', text))
+    return cjk_count + latin_words
 
 # Minimal CSS
 custom_css = """
@@ -159,11 +170,8 @@ def create_app():
                 
                 # Performance metrics
                 total_dur = time.time() - start_time
-                is_cjk = any('\u4e00' <= c <= '\u9fff' for c in text)
-                count = len(text) if is_cjk else len(text.split())
-                label = "Chars" if is_cjk else "Words"
-                
-                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | {label}: {count}"
+                word_count = count_words(text)
+                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {word_count}"
                 
                 zip_path = package_zip(text, audio_path, srt)
                 yield audio_path, srt, gr.update(value=zip_path, visible=True), perf_msg
@@ -235,10 +243,8 @@ def create_app():
                 asr_dur = time.time() - asr_start
                 
                 total_dur = time.time() - start_time
-                is_cjk = any('\u4e00' <= c <= '\u9fff' for c in text)
-                count = len(text) if is_cjk else len(text.split())
-                label = "Chars" if is_cjk else "Words"
-                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | {label}: {count}"
+                word_count = count_words(text)
+                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {word_count}"
                     
                 zip_path = package_zip(text, audio_path, srt)
                 yield audio_path, srt, gr.update(value=zip_path, visible=True), perf_msg
@@ -302,10 +308,8 @@ def create_app():
                 asr_dur = time.time() - asr_start
                 
                 total_dur = time.time() - start_time
-                is_cjk = any('\u4e00' <= c <= '\u9fff' for c in text)
-                count = len(text) if is_cjk else len(text.split())
-                label = "Chars" if is_cjk else "Words"
-                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | {label}: {count}"
+                word_count = count_words(text)
+                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {word_count}"
                     
                 zip_path = package_zip(text, audio_path, srt)
                 yield audio_path, srt, gr.update(value=zip_path, visible=True), perf_msg
