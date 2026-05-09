@@ -23,3 +23,4 @@ python -m omnivoice.app_colab
 - **Custom Voice**: 9 preset character voices with style control.
 - **Voice Design**: Create unique voices from text descriptions.
 - **Optimized**: Uses FP16, SDPA, and TF32 for maximum performance on T4 GPUs.
+- **CPU Support**: Now compatible with CPU environments (automatically detects hardware).

@@ -9,13 +9,21 @@ from qwen_tts import Qwen3TTSModel
 current_model = None
 current_model_type = None
 
-# Enable PyTorch optimizations
-torch.backends.cudnn.benchmark = True
-torch.backends.cudnn.conv.fp32_precision = 'tf32'
-torch.backends.cuda.matmul.fp32_precision = 'tf32'
+# Device detection
+DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
+DTYPE = torch.float16 if torch.cuda.is_available() else torch.float32
+
+# Enable PyTorch optimizations if GPU is available
+if torch.cuda.is_available():
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.conv.fp32_precision = 'tf32'
+    torch.backends.cuda.matmul.fp32_precision = 'tf32'
+    print(f"🚀 Running on GPU: {torch.cuda.get_device_name(0)}")
+else:
+    print("⚠️ CUDA not available. Running on CPU (this will be slow).")
 
 def load_model(model_type):
-    """Load model with SDPA optimization"""
+    """Load model with appropriate hardware optimization"""
     global current_model, current_model_type
 
     if current_model_type == model_type:
@@ -26,9 +34,10 @@ def load_model(model_type):
         print(f"Unloading {current_model_type} model...")
         del current_model
         gc.collect()
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
-    print(f"Loading {model_type} model (1.7B)...")
+    print(f"Loading {model_type} model (1.7B) on {DEVICE}...")
     start = time.time()
 
     try:
@@ -41,16 +50,19 @@ def load_model(model_type):
 
         current_model = Qwen3TTSModel.from_pretrained(
             model_name,
-            torch_dtype=torch.float16,
-            device_map="cuda:0",
-            attn_implementation="sdpa"
+            torch_dtype=DTYPE,
+            device_map=DEVICE,
+            attn_implementation="sdpa" if torch.cuda.is_available() else "eager"
         )
 
         current_model_type = model_type
         load_time = time.time() - start
 
-        allocated = torch.cuda.memory_allocated(0) / 1024**3
-        print(f"✅ Loaded in {load_time:.1f}s | GPU: {allocated:.2f}GB")
+        if torch.cuda.is_available():
+            allocated = torch.cuda.memory_allocated(0) / 1024**3
+            print(f"✅ Loaded in {load_time:.1f}s | GPU: {allocated:.2f}GB")
+        else:
+            print(f"✅ Loaded in {load_time:.1f}s")
 
         return current_model
 
@@ -109,7 +121,8 @@ def voice_clone(text, reference_audio, ref_transcript, use_fast_mode):
 
         print(f"✅ Done! Total: {total_time:.1f}s | Gen: {gen_time:.1f}s | Audio: {audio_duration:.1f}s | RTF: {rtf:.2f}x")
 
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         gc.collect()
 
         return temp_file.name
@@ -156,7 +169,8 @@ def custom_voice(text, voice_name, instruction):
 
         print(f"✅ Done! Total: {total_time:.1f}s | Gen: {gen_time:.1f}s | Audio: {audio_duration:.1f}s | RTF: {rtf:.2f}x")
 
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         gc.collect()
 
         return temp_file.name
@@ -196,7 +210,8 @@ def voice_design(text, voice_description):
 
         print(f"✅ Done! Total: {total_time:.1f}s | Gen: {gen_time:.1f}s | Audio: {audio_duration:.1f}s | RTF: {rtf:.2f}x")
 
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         gc.collect()
 
         return temp_file.name
