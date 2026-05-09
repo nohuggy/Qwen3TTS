@@ -70,7 +70,7 @@ def create_app():
                     clone_output = gr.Audio(label="Generated Speech")
                     with gr.Group():
                         clone_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    gr.HTML("<br>")
+
                     with gr.Group():
                         clone_status = gr.Textbox(label="Status", value="", interactive=False, lines=2)
                     clone_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
@@ -188,7 +188,7 @@ def create_app():
                     custom_output = gr.Audio(label="Generated Speech")
                     with gr.Group():
                         custom_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    gr.HTML("<br>")
+
                     with gr.Group():
                         custom_status = gr.Textbox(label="Status", value="", interactive=False, lines=2)
                     custom_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
@@ -248,7 +248,7 @@ def create_app():
                     design_output = gr.Audio(label="Generated Speech")
                     with gr.Group():
                         design_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    gr.HTML("<br>")
+
                     with gr.Group():
                         design_status = gr.Textbox(label="Status", value="", interactive=False, lines=2)
                     design_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
