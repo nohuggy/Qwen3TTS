@@ -379,8 +379,9 @@ def voice_clone(text, reference_audio, ref_transcript, gen_srt=False, convert_pu
         yield (temp_file.name, srt_content)
 
     except Exception as e:
-        print(f"❌ Error in voice_clone: {str(e)}")
-        return None, ""
+        msg = f"❌ Error in voice_clone: {str(e)}"
+        print(msg)
+        yield msg
 
 def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=False, status_callback=None):
     """Generate speech using preset voices with chunk awareness"""
@@ -462,8 +463,9 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
         yield (temp_file.name, srt_content)
 
     except Exception as e:
-        print(f"❌ Error in custom_voice: {str(e)}")
-        return None, ""
+        msg = f"❌ Error in custom_voice: {str(e)}"
+        print(msg)
+        yield msg
 
 def voice_design(text, voice_description, gen_srt=False, convert_punc=False, status_callback=None):
     """Generate speech from text description with chunk awareness"""
@@ -531,8 +533,9 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False, sta
         yield (temp_file.name, "")
 
     except Exception as e:
-        print(f"❌ Error in voice_design: {str(e)}")
-        return None, ""
+        msg = f"❌ Error in voice_design: {str(e)}"
+        print(msg)
+        yield msg
 
 def get_asr_pipe():
     """Load Qwen3-ASR-0.6B model"""
