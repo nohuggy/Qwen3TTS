@@ -276,28 +276,37 @@ def align_robust(user_segments, aligner_tokens):
     return results
 
 def clean_script(text):
-    """Robust removal of ## Name ##, [emotion], and [pause:X] for SRT generation"""
+    """Purify script by reconstructing only the spoken dialogue, removing all technical tags"""
     if not text: return ""
     
-    # 1. Remove speaker headers: ## Name ## (DOTALL to catch multi-line if any)
-    text = re.sub(r"##.*?##", "", text, flags=re.DOTALL)
+    # 1. Parse into segments (same logic as voice_clone to ensure consistency)
+    segments = re.findall(r"##\s*(.*?)\s*##\s*(.*?)(?=##|$)", text, re.DOTALL)
     
-    # 2. Remove pause tags: [pause:0.5]
-    text = re.sub(r"\[pause:\d+\.?\d*\]", "", text, flags=re.DOTALL)
-    
-    # 3. Remove emotion tags: [happy], [shout], etc.
-    # Broad match for anything inside brackets, handling multi-line
-    text = re.sub(r"\[.*?\]", "", text, flags=re.DOTALL)
-    
-    # 4. Final cleanup of whitespace and empty lines
-    lines = []
-    for line in text.split('\n'):
-        # Strip and remove common punctuation that might remain at the start of a line
-        l = line.strip()
-        if l:
-            lines.append(l)
+    if not segments:
+        # Mono Mode: Use aggressive regex cleaning
+        # Remove ## Name ##
+        clean = re.sub(r"##.*?##", "", text, flags=re.DOTALL)
+        # Remove [pause:X]
+        clean = re.sub(r"\[pause:\d+\.?\d*\]", "", clean, flags=re.DOTALL)
+        # Remove [anything else]
+        clean = re.sub(r"\[.*?\]", "", clean, flags=re.DOTALL)
+        # Cleanup
+        return " ".join([l.strip() for l in clean.split('\n') if l.strip()])
+
+    # Multi Mode: Reconstruct from segments
+    clean_parts = []
+    for _, raw_content in segments:
+        # A. Remove emotion tag from the start: [tag]
+        content = re.sub(r"^\s*\[.*?\]", "", raw_content, flags=re.DOTALL)
+        # B. Remove any internal pauses: [pause:X]
+        content = re.sub(r"\[pause:\d+\.?\d*\]", "", content, flags=re.DOTALL)
+        # C. Remove any other bracketed acting instructions
+        content = re.sub(r"\[.*?\]", "", content, flags=re.DOTALL)
+        
+        if content.strip():
+            clean_parts.append(content.strip())
             
-    return " ".join(lines)
+    return " ".join(clean_parts)
 
 def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False, status_callback=None):
     """Generate speech using a Role Bank and script tags (## Name ##, [pause], [emotion])"""
