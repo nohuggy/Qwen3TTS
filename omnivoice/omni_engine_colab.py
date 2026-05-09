@@ -272,16 +272,35 @@ def get_asr_pipe():
             )
             print("✅ ASR model loaded")
         except ImportError:
-            print("⚠️ qwen-asr not installed. Attempting to use transformers pipeline as fallback...")
-            from transformers import pipeline
-            ASR_PIPE = pipeline(
-                "automatic-speech-recognition",
-                model="Qwen/Qwen3-ASR-0.6B",
-                device=DEVICE,
-                torch_dtype=DTYPE,
-                trust_remote_code=True
-            )
-            print("✅ ASR model loaded (Pipeline Fallback)")
+            print("⚠️ qwen-asr not installed. Attempting automatic installation...")
+            try:
+                import subprocess
+                subprocess.run(["pip", "install", "qwen-asr"], check=True)
+                from qwen_asr import Qwen3ASRModel
+                ASR_PIPE = Qwen3ASRModel.from_pretrained(
+                    "Qwen/Qwen3-ASR-0.6B",
+                    dtype=DTYPE,
+                    device_map=DEVICE,
+                    attn_implementation="sdpa" if torch.cuda.is_available() else "eager"
+                )
+                print("✅ ASR model loaded after installation")
+            except Exception as e:
+                print(f"❌ Automatic installation failed: {e}")
+                print("Attempting to use transformers pipeline as final fallback...")
+                try:
+                    from transformers import pipeline, AutoModel, AutoConfig
+                    # Register custom model if necessary, though trust_remote_code should handle it
+                    ASR_PIPE = pipeline(
+                        "automatic-speech-recognition",
+                        model="Qwen/Qwen3-ASR-0.6B",
+                        device=DEVICE,
+                        torch_dtype=DTYPE,
+                        trust_remote_code=True
+                    )
+                    print("✅ ASR model loaded (Pipeline Fallback)")
+                except Exception as e2:
+                    print(f"❌ Final fallback failed: {e2}")
+                    raise ImportError("qwen-asr is required for Qwen3-ASR. Please run 'pip install qwen-asr'")
     return ASR_PIPE
 
 def unload_asr():
