@@ -8,6 +8,12 @@ custom_css = """
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
     border: none !important;
 }
+.status-msg {
+    font-size: 0.9em;
+    color: #a0aec0;
+    margin-bottom: 8px;
+    font-family: monospace;
+}
 """
 
 def package_zip(text, audio_path, srt_content):
@@ -59,6 +65,7 @@ def create_app():
 
                     clone_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
+                    clone_status = gr.Markdown("### 🕒 Status: Ready", elem_classes="status-msg")
                     clone_output = gr.Audio(label="Generated Speech")
                     clone_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
                     clone_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
@@ -99,29 +106,46 @@ def create_app():
                         return tf.read()
 
             def on_clone(text, audio, transcript, gen_srt, conv_punc):
+                import time
+                start_time = time.time()
+                
                 # Phase 1: Generate Audio
+                yield gr.update(), "### 🕒 Status: ⏱️ Generating audio...", gr.update(visible=False)
+                tts_start = time.time()
                 audio_path, _ = voice_clone(text, audio, transcript, gen_srt=False, convert_punc=conv_punc)
+                tts_dur = time.time() - tts_start
+                
                 if not audio_path:
-                    yield None, "❌ Generation failed.", gr.update(visible=False)
+                    yield None, "### 🕒 Status: ❌ Generation failed.", gr.update(visible=False)
                     return
                 
                 # Show audio immediately
-                yield audio_path, "Audio ready. Aligning subtitles...", gr.update(visible=False)
+                yield audio_path, "### 🕒 Status: ⏳ Audio ready. Aligning subtitles...", gr.update(visible=False)
                 
                 # Phase 2: Subtitles (Memory Intensive)
+                asr_start = time.time()
                 srt = ""
                 if gen_srt:
                     from omnivoice.omni_engine_colab import generate_srt
                     srt = generate_srt(text, audio_path)
+                asr_dur = time.time() - asr_start
+                
+                # Performance metrics
+                total_dur = time.time() - start_time
+                import soundfile as sf
+                audio_data, sr = sf.read(audio_path)
+                audio_dur = len(audio_data) / sr
+                
+                perf_msg = f"### ✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Audio: {audio_dur:.1f}s"
                 
                 zip_path = package_zip(text, audio_path, srt)
-                yield audio_path, srt, gr.update(value=zip_path, visible=True)
+                yield audio_path, srt, gr.update(value=zip_path, visible=True), perf_msg
 
             trans_btn.click(on_transcribe, inputs=[clone_audio], outputs=[clone_transcript])
             ref_zip_btn.upload(process_ref_zip, inputs=[ref_zip_btn], outputs=[clone_audio, clone_transcript])
             ref_txt_btn.upload(process_ref_txt, inputs=[ref_txt_btn], outputs=[clone_transcript])
 
-            clone_btn.click(on_clone, inputs=[clone_text, clone_audio, clone_transcript, clone_gen_srt, clone_conv_punc], outputs=[clone_output, clone_srt_preview, clone_zip_dl])
+            clone_btn.click(on_clone, inputs=[clone_text, clone_audio, clone_transcript, clone_gen_srt, clone_conv_punc], outputs=[clone_output, clone_srt_preview, clone_zip_dl, clone_status])
 
         with gr.Tab("Custom Voice"):
             gr.Markdown("### Use 9 preset character voices with style control")
@@ -140,29 +164,44 @@ def create_app():
                         
                     custom_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
+                    custom_status = gr.Markdown("### 🕒 Status: Ready", elem_classes="status-msg")
                     custom_output = gr.Audio(label="Generated Speech")
                     custom_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
                     custom_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
 
             def on_custom(text, name, instr, gen_srt, conv_punc):
+                import time
+                start_time = time.time()
                 # Phase 1: Audio
+                yield gr.update(), "### 🕒 Status: ⏱️ Generating audio...", gr.update(visible=False)
+                tts_start = time.time()
                 audio_path, _ = custom_voice(text, name, instr, gen_srt=False, convert_punc=conv_punc)
+                tts_dur = time.time() - tts_start
+                
                 if not audio_path:
-                    yield None, "❌ Generation failed.", gr.update(visible=False)
+                    yield None, "### 🕒 Status: ❌ Generation failed.", gr.update(visible=False)
                     return
                 
-                yield audio_path, "Audio ready. Aligning subtitles...", gr.update(visible=False)
+                yield audio_path, "### 🕒 Status: ⏳ Audio ready. Aligning subtitles...", gr.update(visible=False)
                 
                 # Phase 2: SRT
+                asr_start = time.time()
                 srt = ""
                 if gen_srt:
                     from omnivoice.omni_engine_colab import generate_srt
                     srt = generate_srt(text, audio_path)
+                asr_dur = time.time() - asr_start
+                
+                total_dur = time.time() - start_time
+                import soundfile as sf
+                audio_data, sr = sf.read(audio_path)
+                audio_dur = len(audio_data) / sr
+                perf_msg = f"### ✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Audio: {audio_dur:.1f}s"
                     
                 zip_path = package_zip(text, audio_path, srt)
-                yield audio_path, srt, gr.update(value=zip_path, visible=True)
+                yield audio_path, srt, gr.update(value=zip_path, visible=True), perf_msg
 
-            custom_btn.click(on_custom, inputs=[custom_text, custom_voice_name, custom_instruction, custom_gen_srt, custom_conv_punc], outputs=[custom_output, custom_srt_preview, custom_zip_dl])
+            custom_btn.click(on_custom, inputs=[custom_text, custom_voice_name, custom_instruction, custom_gen_srt, custom_conv_punc], outputs=[custom_output, custom_srt_preview, custom_zip_dl, custom_status])
 
         with gr.Tab("Voice Design"):
             gr.Markdown("### Design a unique voice from text description")
@@ -177,29 +216,44 @@ def create_app():
                         
                     design_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
+                    design_status = gr.Markdown("### 🕒 Status: Ready", elem_classes="status-msg")
                     design_output = gr.Audio(label="Generated Speech")
                     design_srt_preview = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
                     design_zip_dl = gr.DownloadButton("📥 Download ZIP (WAV + SRT)", visible=False)
 
             def on_design(text, desc, gen_srt, conv_punc):
+                import time
+                start_time = time.time()
                 # Phase 1: Audio
+                yield gr.update(), "### 🕒 Status: ⏱️ Generating audio...", gr.update(visible=False)
+                tts_start = time.time()
                 audio_path, _ = voice_design(text, desc, gen_srt=False, convert_punc=conv_punc)
+                tts_dur = time.time() - tts_start
+                
                 if not audio_path:
-                    yield None, "❌ Generation failed.", gr.update(visible=False)
+                    yield None, "### 🕒 Status: ❌ Generation failed.", gr.update(visible=False)
                     return
                 
-                yield audio_path, "Audio ready. Aligning subtitles...", gr.update(visible=False)
+                yield audio_path, "### 🕒 Status: ⏳ Audio ready. Aligning subtitles...", gr.update(visible=False)
                 
                 # Phase 2: SRT
+                asr_start = time.time()
                 srt = ""
                 if gen_srt:
                     from omnivoice.omni_engine_colab import generate_srt
                     srt = generate_srt(text, audio_path)
+                asr_dur = time.time() - asr_start
+                
+                total_dur = time.time() - start_time
+                import soundfile as sf
+                audio_data, sr = sf.read(audio_path)
+                audio_dur = len(audio_data) / sr
+                perf_msg = f"### ✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Audio: {audio_dur:.1f}s"
                     
                 zip_path = package_zip(text, audio_path, srt)
-                yield audio_path, srt, gr.update(value=zip_path, visible=True)
+                yield audio_path, srt, gr.update(value=zip_path, visible=True), perf_msg
 
-            design_btn.click(on_design, inputs=[design_text, design_description, design_gen_srt, design_conv_punc], outputs=[design_output, design_srt_preview, design_zip_dl])
+            design_btn.click(on_design, inputs=[design_text, design_description, design_gen_srt, design_conv_punc], outputs=[design_output, design_srt_preview, design_zip_dl, design_status])
 
     return demo
 
