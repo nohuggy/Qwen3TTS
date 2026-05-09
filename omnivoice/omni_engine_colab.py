@@ -23,6 +23,32 @@ if torch.cuda.is_available():
 else:
     print("⚠️ CUDA not available. Running on CPU (this will be slow).")
 
+def setup_asr():
+    """Perform initial ASR setup: install package and pre-download weights"""
+    print("🛠️ Initializing ASR Setup...")
+    try:
+        import qwen_asr
+        print("   ✅ qwen-asr already installed.")
+    except ImportError:
+        print("   📥 Installing qwen-asr package...")
+        try:
+            import subprocess
+            subprocess.run(["pip", "install", "qwen-asr"], check=True)
+            print("   ✅ qwen-asr installed successfully.")
+        except Exception as e:
+            print(f"   ❌ Failed to install qwen-asr: {e}")
+
+    try:
+        print("   📥 Pre-warming Qwen3-ASR-0.6B cache (HuggingFace)...")
+        from huggingface_hub import snapshot_download
+        snapshot_download(repo_id="Qwen/Qwen3-ASR-0.6B")
+        print("   ✅ ASR weights cached and ready.")
+    except Exception as e:
+        print(f"   ⚠️ Could not pre-warm ASR cache: {e}")
+
+# Run setup at boot
+setup_asr()
+
 def load_model(model_type):
     """Load model with appropriate hardware optimization"""
     global current_model, current_model_type
@@ -271,36 +297,22 @@ def get_asr_pipe():
                 attn_implementation="sdpa" if torch.cuda.is_available() else "eager"
             )
             print("✅ ASR model loaded")
-        except ImportError:
-            print("⚠️ qwen-asr not installed. Attempting automatic installation...")
+        except Exception as e:
+            print(f"⚠️ Failed to load Qwen3ASRModel: {e}")
+            print("Attempting to use transformers pipeline as final fallback...")
             try:
-                import subprocess
-                subprocess.run(["pip", "install", "qwen-asr"], check=True)
-                from qwen_asr import Qwen3ASRModel
-                ASR_PIPE = Qwen3ASRModel.from_pretrained(
-                    "Qwen/Qwen3-ASR-0.6B",
-                    dtype=DTYPE,
-                    device_map=DEVICE,
-                    attn_implementation="sdpa" if torch.cuda.is_available() else "eager"
+                from transformers import pipeline
+                ASR_PIPE = pipeline(
+                    "automatic-speech-recognition",
+                    model="Qwen/Qwen3-ASR-0.6B",
+                    device=DEVICE,
+                    torch_dtype=DTYPE,
+                    trust_remote_code=True
                 )
-                print("✅ ASR model loaded after installation")
-            except Exception as e:
-                print(f"❌ Automatic installation failed: {e}")
-                print("Attempting to use transformers pipeline as final fallback...")
-                try:
-                    from transformers import pipeline, AutoModel, AutoConfig
-                    # Register custom model if necessary, though trust_remote_code should handle it
-                    ASR_PIPE = pipeline(
-                        "automatic-speech-recognition",
-                        model="Qwen/Qwen3-ASR-0.6B",
-                        device=DEVICE,
-                        torch_dtype=DTYPE,
-                        trust_remote_code=True
-                    )
-                    print("✅ ASR model loaded (Pipeline Fallback)")
-                except Exception as e2:
-                    print(f"❌ Final fallback failed: {e2}")
-                    raise ImportError("qwen-asr is required for Qwen3-ASR. Please run 'pip install qwen-asr'")
+                print("✅ ASR model loaded (Pipeline Fallback)")
+            except Exception as e2:
+                print(f"❌ Final fallback failed: {e2}")
+                raise ImportError("qwen-asr is required for Qwen3-ASR. Please run 'pip install qwen-asr'")
     return ASR_PIPE
 
 def unload_asr():
