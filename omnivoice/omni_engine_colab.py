@@ -142,6 +142,23 @@ def unify_punctuation(text):
         text = text.replace(old, new)
     return text
 
+def get_slug(text, max_tokens=8):
+    """Generate a clean filename slug from text (OmniVoice Rules)"""
+    if not text: return "output"
+    clean_text = re.sub(r"[^\w\s\u4e00-\u9fff]", "", text)
+    tokens = re.findall(r"[\u4e00-\u9fff]|[a-zA-Z0-9]+", clean_text)
+    selected = tokens[:max_tokens]
+    if not selected:
+        return "output"
+    res = selected[0]
+    for i in range(1, len(selected)):
+        prev, curr = selected[i - 1], selected[i]
+        if re.match(r"[a-zA-Z0-9]", prev) or re.match(r"[a-zA-Z0-9]", curr):
+            res += " " + curr
+        else:
+            res += curr
+    return res.strip()
+
 def smart_balanced_split(text, target_words=10, max_words=15):
     """Split original text into readable segments for subtitles"""
     if not text: return []
