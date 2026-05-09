@@ -17,7 +17,10 @@ def package_zip(text, audio_path, srt_content):
     from omnivoice.omni_engine_colab import get_slug
     
     slug = get_slug(text)
-    zip_path = audio_path.replace(".wav", ".zip")
+    # Ensure outputs directory exists
+    os.makedirs("outputs", exist_ok=True)
+    # Create the ZIP in the outputs folder with the slug as the filename
+    zip_path = os.path.join("outputs", f"{slug}.zip")
     
     with zipfile.ZipFile(zip_path, 'w') as zipf:
         # Save as slug-based filename inside the ZIP
