@@ -21,9 +21,9 @@ def create_app():
                 with gr.Column():
                     clone_text = gr.Textbox(label="Text to Synthesize", placeholder="Enter text...", lines=4)
                     clone_audio = gr.Audio(label="Reference Audio (3+ seconds)", type="filepath")
-                    clone_transcript = gr.Textbox(label="Transcript (Optional)", placeholder="What's said in the audio...", lines=3)
-                    clone_fast_mode = gr.Checkbox(label="Fast Mode (skip transcript)", value=True)
-                    clone_btn = gr.Button("🎵 Generate Speech", variant="primary", size="lg")
+                    clone_transcript = gr.Textbox(label="Reference Transcript (Optional)", placeholder="What's said in the reference audio... Improves quality.", lines=3)
+                    clone_fast_mode = gr.Checkbox(label="Fast Mode (Ignore transcript, faster inference)", value=True)
+                    clone_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
                     clone_output = gr.Audio(label="Generated Speech")
 
@@ -39,7 +39,7 @@ def create_app():
                         label="Voice Character", value="serena"
                     )
                     custom_instruction = gr.Textbox(label="Style Instruction (Optional)", placeholder="e.g., 'speak slowly and cheerfully'", lines=2)
-                    custom_btn = gr.Button("🎵 Generate Speech", variant="primary", size="lg")
+                    custom_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
                     custom_output = gr.Audio(label="Generated Speech")
 
@@ -51,7 +51,7 @@ def create_app():
                 with gr.Column():
                     design_text = gr.Textbox(label="Text to Synthesize", placeholder="Enter text...", lines=4)
                     design_description = gr.Textbox(label="Voice Description", placeholder="A young female, cheerful, speaking clearly", lines=4)
-                    design_btn = gr.Button("🎵 Generate Speech", variant="primary", size="lg")
+                    design_btn = gr.Button("Generate Speech", variant="primary", size="lg")
                 with gr.Column():
                     design_output = gr.Audio(label="Generated Speech")
 
