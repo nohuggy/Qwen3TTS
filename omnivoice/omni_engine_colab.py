@@ -86,19 +86,20 @@ def voice_clone(text, reference_audio, ref_transcript):
         print(f"⏱️ Creating prompt...")
         prompt_start = time.time()
 
-        # Automatic Fast Mode: if transcript is missing, use x-vector only mode
-        if not ref_transcript or not ref_transcript.strip():
-            print("   (Using Fast Mode: No transcript provided)")
-            prompt_items = model.create_voice_clone_prompt(
-                ref_audio=reference_audio,
-                x_vector_only_mode=True
-            )
-        else:
-            print("   (Using High Quality Mode: Transcript provided)")
+        # Logic: If transcript is provided, use high-quality mode.
+        # If empty, fallback to x-vector only mode (Fast Mode).
+        if ref_transcript and ref_transcript.strip():
+            print("   Mode: High-Quality (using transcript)")
             prompt_items = model.create_voice_clone_prompt(
                 ref_audio=reference_audio,
                 ref_text=ref_transcript,
                 x_vector_only_mode=False
+            )
+        else:
+            print("   Mode: Standard (no transcript, using x-vector fallback)")
+            prompt_items = model.create_voice_clone_prompt(
+                ref_audio=reference_audio,
+                x_vector_only_mode=True
             )
 
         prompt_time = time.time() - prompt_start
