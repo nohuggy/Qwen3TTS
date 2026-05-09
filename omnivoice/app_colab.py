@@ -153,8 +153,9 @@ def create_app():
                 asr_start = time.time()
                 srt = ""
                 if gen_srt:
-                    from omnivoice.omni_engine_colab import generate_srt
-                    for status in generate_srt(text, audio_path, total_start_time=start_time):
+                    from omnivoice.omni_engine_colab import generate_srt, clean_script
+                    clean_text = clean_script(text)
+                    for status in generate_srt(clean_text, audio_path, total_start_time=start_time):
                         if isinstance(status, str) and not status.startswith("1\n"): # Check if it's status or SRT
                             yield audio_path, gr.update(), gr.update(visible=False), status
                         else:
@@ -297,8 +298,9 @@ def create_app():
                 asr_start = time.time()
                 srt = ""
                 if gen_srt:
-                    from omnivoice.omni_engine_colab import generate_srt
-                    for status in generate_srt(text, audio_path, total_start_time=start_time):
+                    from omnivoice.omni_engine_colab import generate_srt, clean_script
+                    clean_text = clean_script(text)
+                    for status in generate_srt(clean_text, audio_path, total_start_time=start_time):
                         if isinstance(status, str) and not status.startswith("1\n"):
                             yield audio_path, gr.update(), gr.update(visible=False), status
                         else:
@@ -369,8 +371,9 @@ def create_app():
                 asr_start = time.time()
                 srt = ""
                 if gen_srt:
-                    from omnivoice.omni_engine_colab import generate_srt
-                    for status in generate_srt(text, audio_path, total_start_time=start_time):
+                    from omnivoice.omni_engine_colab import generate_srt, clean_script
+                    clean_text = clean_script(text)
+                    for status in generate_srt(clean_text, audio_path, total_start_time=start_time):
                         if isinstance(status, str) and not status.startswith("1\n"):
                             yield audio_path, gr.update(), gr.update(visible=False), status
                         else:
