@@ -67,23 +67,25 @@ def create_app():
 
             def process_ref_zip(zip_file):
                 if not zip_file: return None, ""
-                import zipfile, tempfile
+                import zipfile, shutil
+                os.makedirs("outputs/refs", exist_ok=True)
                 audio_path = None
                 text_content = ""
-                tmp = tempfile.mkdtemp()
+                
                 with zipfile.ZipFile(zip_file.name, 'r') as z:
-                    z.extractall(tmp)
                     for f in z.namelist():
                         if f.endswith(('.wav', '.mp3', '.flac')) and not f.startswith('__MACOSX') and not os.path.basename(f).startswith('.'):
-                            audio_path = os.path.join(tmp, f)
+                            filename = os.path.basename(f)
+                            dest = os.path.join("outputs/refs", filename)
+                            with z.open(f) as source, open(dest, "wb") as target:
+                                shutil.copyfileobj(source, target)
+                            audio_path = dest
                         if f.endswith('.txt') and not f.startswith('__MACOSX') and not os.path.basename(f).startswith('.'):
-                            txt_path = os.path.join(tmp, f)
-                            try:
-                                with open(txt_path, 'r', encoding='utf-8') as tf:
-                                    text_content = tf.read()
-                            except UnicodeDecodeError:
-                                with open(txt_path, 'r', encoding='gbk') as tf:
-                                    text_content = tf.read()
+                            with z.open(f) as tf:
+                                try:
+                                    text_content = tf.read().decode('utf-8')
+                                except:
+                                    text_content = tf.read().decode('gbk', errors='ignore')
                 return audio_path, text_content
 
             def process_ref_txt(txt_file):
@@ -166,6 +168,7 @@ def create_app():
                             r1_trans_btn = gr.Button("Trans Ref", variant="primary", size="sm")
                             r1_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="primary", size="sm")
                             r1_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="primary", size="sm")
+                            r1_clear_btn = gr.Button("Clear", variant="secondary", size="sm")
                     
                     with gr.Accordion("Role 2", open=False):
                         r2_name = gr.Textbox(label="Role Name", placeholder="e.g. Sara")
@@ -175,6 +178,7 @@ def create_app():
                             r2_trans_btn = gr.Button("Trans Ref", variant="primary", size="sm")
                             r2_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="primary", size="sm")
                             r2_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="primary", size="sm")
+                            r2_clear_btn = gr.Button("Clear", variant="secondary", size="sm")
                         
                     with gr.Accordion("Role 3", open=False):
                         r3_name = gr.Textbox(label="Role Name", placeholder="e.g. Bob")
@@ -184,6 +188,7 @@ def create_app():
                             r3_trans_btn = gr.Button("Trans Ref", variant="primary", size="sm")
                             r3_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="primary", size="sm")
                             r3_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="primary", size="sm")
+                            r3_clear_btn = gr.Button("Clear", variant="secondary", size="sm")
 
                 with gr.Column():
                     with gr.Group():
@@ -203,16 +208,19 @@ def create_app():
             r1_trans_btn.click(on_transcribe, inputs=[r1_audio], outputs=[r1_text])
             r1_zip_btn.upload(process_ref_zip, inputs=[r1_zip_btn], outputs=[r1_audio, r1_text])
             r1_txt_btn.upload(process_ref_txt, inputs=[r1_txt_btn], outputs=[r1_text])
+            r1_clear_btn.click(lambda: (None, None, ""), outputs=[r1_name, r1_audio, r1_text])
             
             # Role 2
             r2_trans_btn.click(on_transcribe, inputs=[r2_audio], outputs=[r2_text])
             r2_zip_btn.upload(process_ref_zip, inputs=[r2_zip_btn], outputs=[r2_audio, r2_text])
             r2_txt_btn.upload(process_ref_txt, inputs=[r2_txt_btn], outputs=[r2_text])
+            r2_clear_btn.click(lambda: (None, None, ""), outputs=[r2_name, r2_audio, r2_text])
             
             # Role 3
             r3_trans_btn.click(on_transcribe, inputs=[r3_audio], outputs=[r3_text])
             r3_zip_btn.upload(process_ref_zip, inputs=[r3_zip_btn], outputs=[r3_audio, r3_text])
             r3_txt_btn.upload(process_ref_txt, inputs=[r3_txt_btn], outputs=[r3_text])
+            r3_clear_btn.click(lambda: (None, None, ""), outputs=[r3_name, r3_audio, r3_text])
 
             btn.click(
                 on_clone,
