@@ -32,8 +32,8 @@ custom_css = """
 }
 .role-name-wrap .load-role-btn {
     position: absolute !important;
-    right: 26px !important;
-    bottom: 21px !important;
+    right: 25px !important;
+    bottom: 20px !important;
     z-index: 100 !important;
     width: fit-content !important;
     max-width: fit-content !important;
