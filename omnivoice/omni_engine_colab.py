@@ -680,15 +680,24 @@ def unload_aligner():
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-def generate_srt(text, audio_path):
-    """Generate SRT subtitles using Forced Aligner and Robust Splitter"""
+def generate_srt(text, audio_path, total_start_time=None):
+    """Generate SRT subtitles using Forced Aligner and Robust Splitter (Generator)"""
     if not text or not audio_path:
-        return ""
+        yield ""
+        return
     try:
+        def get_msg(m):
+            if total_start_time:
+                return f"{m} [Elapsed: {time.time() - total_start_time:.1f}s]"
+            return m
+
+        yield get_msg("Loading Aligner Engine...")
         model = get_aligner_pipe()
-        if model is None: return ""
+        if model is None: 
+            yield "❌ Aligner Engine failed to load."
+            return
         
-        print("🔍 Generating subtitles (Forced Aligner + Robust Mapping)...")
+        yield get_msg("🔍 Aligning subtitles...")
         # Step 1: Split original text into balanced segments
         user_segments = smart_balanced_split(text)
         
@@ -701,8 +710,10 @@ def generate_srt(text, audio_path):
         
         if not results or not results[0].time_stamps:
             print("⚠️ No timestamps generated.")
-            return ""
+            yield ""
+            return
         
+        yield get_msg("📝 Formatting SRT...")
         # Step 3: Align original segments to timestamps
         aligned = align_robust(user_segments, results[0].time_stamps)
         
@@ -713,8 +724,8 @@ def generate_srt(text, audio_path):
         
         print("✅ SRT generated successfully")
         unload_aligner()
-        return srt_content.strip()
+        yield srt_content.strip()
     except Exception as e:
         print(f"❌ SRT Generation Error: {e}")
         unload_aligner()
-        return f"SRT Error: {e}"
+        yield f"SRT Error: {e}"

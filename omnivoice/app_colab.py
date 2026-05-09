@@ -150,16 +150,20 @@ def create_app():
                 srt = ""
                 if gen_srt:
                     from omnivoice.omni_engine_colab import generate_srt
-                    srt = generate_srt(text, audio_path)
+                    for status in generate_srt(text, audio_path, total_start_time=start_time):
+                        if isinstance(status, str) and not status.startswith("1\n"): # Check if it's status or SRT
+                            yield audio_path, gr.update(), gr.update(visible=False), status
+                        else:
+                            srt = status
                 asr_dur = time.time() - asr_start
                 
                 # Performance metrics
                 total_dur = time.time() - start_time
-                import soundfile as sf
-                audio_data, sr = sf.read(audio_path)
-                audio_dur = len(audio_data) / sr
+                is_cjk = any('\u4e00' <= c <= '\u9fff' for c in text)
+                count = len(text) if is_cjk else len(text.split())
+                label = "Chars" if is_cjk else "Words"
                 
-                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Audio: {audio_dur:.1f}s"
+                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | {label}: {count}"
                 
                 zip_path = package_zip(text, audio_path, srt)
                 yield audio_path, srt, gr.update(value=zip_path, visible=True), perf_msg
@@ -223,14 +227,18 @@ def create_app():
                 srt = ""
                 if gen_srt:
                     from omnivoice.omni_engine_colab import generate_srt
-                    srt = generate_srt(text, audio_path)
+                    for status in generate_srt(text, audio_path, total_start_time=start_time):
+                        if isinstance(status, str) and not status.startswith("1\n"):
+                            yield audio_path, gr.update(), gr.update(visible=False), status
+                        else:
+                            srt = status
                 asr_dur = time.time() - asr_start
                 
                 total_dur = time.time() - start_time
-                import soundfile as sf
-                audio_data, sr = sf.read(audio_path)
-                audio_dur = len(audio_data) / sr
-                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Audio: {audio_dur:.1f}s"
+                is_cjk = any('\u4e00' <= c <= '\u9fff' for c in text)
+                count = len(text) if is_cjk else len(text.split())
+                label = "Chars" if is_cjk else "Words"
+                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | {label}: {count}"
                     
                 zip_path = package_zip(text, audio_path, srt)
                 yield audio_path, srt, gr.update(value=zip_path, visible=True), perf_msg
@@ -286,14 +294,18 @@ def create_app():
                 srt = ""
                 if gen_srt:
                     from omnivoice.omni_engine_colab import generate_srt
-                    srt = generate_srt(text, audio_path)
+                    for status in generate_srt(text, audio_path, total_start_time=start_time):
+                        if isinstance(status, str) and not status.startswith("1\n"):
+                            yield audio_path, gr.update(), gr.update(visible=False), status
+                        else:
+                            srt = status
                 asr_dur = time.time() - asr_start
                 
                 total_dur = time.time() - start_time
-                import soundfile as sf
-                audio_data, sr = sf.read(audio_path)
-                audio_dur = len(audio_data) / sr
-                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Audio: {audio_dur:.1f}s"
+                is_cjk = any('\u4e00' <= c <= '\u9fff' for c in text)
+                count = len(text) if is_cjk else len(text.split())
+                label = "Chars" if is_cjk else "Words"
+                perf_msg = f"✅ Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | {label}: {count}"
                     
                 zip_path = package_zip(text, audio_path, srt)
                 yield audio_path, srt, gr.update(value=zip_path, visible=True), perf_msg
