@@ -25,9 +25,9 @@ custom_css = """
     margin-bottom: 8px;
     font-family: monospace;
 }
-/* Small gap above Status panel */
-.status-gap {
-    margin-top: 8px !important;
+/* Small gap above Status panels */
+#vc_status, #cv_status, #vd_status {
+    margin-top: 10px !important;
 }
 /* Load Role button overlaid inside the Role Name textbox */
 .role-name-wrap {
@@ -38,12 +38,15 @@ custom_css = """
     right: 6px !important;
     bottom: 6px !important;
     z-index: 100 !important;
+    width: fit-content !important;
+    max-width: fit-content !important;
 }
 .role-name-wrap .load-role-btn button {
     font-size: 0.75rem !important;
     padding: 3px 10px !important;
     height: 26px !important;
     min-width: auto !important;
+    width: auto !important;
     opacity: 0.8;
     border-radius: 4px !important;
 }
@@ -221,7 +224,7 @@ def create_app():
                 with gr.Column():
                     audio_out  = gr.Audio(label="Generated Speech")
                     srt_out    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    status_out = gr.Textbox(label="Status", value="", interactive=False, lines=2, elem_classes="status-gap")
+                    status_out = gr.Textbox(label="Status", value="", interactive=False, lines=2, elem_id="vc_status")
                     temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc = _adv_accordion()
                     btn     = gr.Button("Generate Audio", variant="primary", size="lg")
                     zip_out = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
@@ -265,7 +268,7 @@ def create_app():
                 with gr.Column():
                     custom_audio  = gr.Audio(label="Generated Speech")
                     custom_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    custom_status = gr.Textbox(label="Status", interactive=False, lines=2, elem_classes="status-gap")
+                    custom_status = gr.Textbox(label="Status", interactive=False, lines=2, elem_id="cv_status")
                     custom_zip    = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
             def on_custom(text, name, instr, temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc):
@@ -324,7 +327,7 @@ def create_app():
                 with gr.Column():
                     design_audio  = gr.Audio(label="Generated Speech")
                     design_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    design_status = gr.Textbox(label="Status", interactive=False, lines=2, elem_classes="status-gap")
+                    design_status = gr.Textbox(label="Status", interactive=False, lines=2, elem_id="vd_status")
                     design_zip    = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
             def on_design(text, desc, temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc):
