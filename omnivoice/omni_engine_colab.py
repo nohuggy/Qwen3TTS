@@ -308,8 +308,12 @@ def clean_script(text):
     # Join with newline to preserve sentence boundaries for the SRT splitter
     return "\n".join(clean_parts)
 
-def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False, status_callback=None):
+def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
+                temperature=0.8, top_p=0.9, repetition_penalty=1.1,
+                subtalker_temperature=0.8, status_callback=None):
     """Generate speech using a Role Bank and script tags (## Name ##, [pause], [emotion])"""
+    # Log advanced params
+    print(f"🎛️ Advanced params — temp={temperature}, top_p={top_p}, rep_pen={repetition_penalty}, sub_temp={subtalker_temperature}")
     if not text or not role_bank_data:
         return None, ""
     
@@ -379,15 +383,25 @@ def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False, status_
             for i, sub in enumerate(sub_parts):
                 if i % 2 == 0: # Text
                     if sub.strip():
-                        # We use generate_voice_clone. 
-                        # Note: Qwen3-TTS usually takes 'instruct' in generate_voice_clone if supported, 
-                        # otherwise we can prefix it to text or use the dedicated variant if needed.
-                        # For base model cloning, 'instruct' is supported in recent versions.
-                        w, _ = model.generate_voice_clone(
-                            text=sub.strip(),
-                            voice_clone_prompt=current_prompt,
-                            instruct=current_instruction if current_instruction != "Standard" else None
-                        )
+                        instr_arg = current_instruction if current_instruction != "Standard" else None
+                        # Build kwargs; try advanced params first, fall back gracefully
+                        try:
+                            w, _ = model.generate_voice_clone(
+                                text=sub.strip(),
+                                voice_clone_prompt=current_prompt,
+                                instruct=instr_arg,
+                                temperature=temperature,
+                                top_p=top_p,
+                                repetition_penalty=repetition_penalty,
+                                subtalker_temperature=subtalker_temperature,
+                            )
+                        except TypeError:
+                            # Older qwen_tts without advanced params — fall back silently
+                            w, _ = model.generate_voice_clone(
+                                text=sub.strip(),
+                                voice_clone_prompt=current_prompt,
+                                instruct=instr_arg,
+                            )
                         wav = w[0]
                         if hasattr(wav, 'cpu'): wav = wav.cpu()
                         if not isinstance(wav, torch.Tensor): wav = torch.from_numpy(wav)

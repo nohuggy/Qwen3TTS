@@ -118,7 +118,8 @@ def create_app():
                          name1, audio1, text1, 
                          name2, audio2, text2, 
                          name3, audio3, text3, 
-                         gen_srt, conv_punc):
+                         gen_srt, conv_punc,
+                         temperature, top_p, repetition_penalty, subtalker_temperature):
                 import time
                 start_time = time.time()
                 # Clear previous outputs immediately
@@ -133,7 +134,11 @@ def create_app():
                 tts_start = time.time()
                 audio_path = None
                 last_status = ""
-                for status in voice_clone(text, role_bank_data, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}")):
+                for status in voice_clone(text, role_bank_data, gen_srt=False, convert_punc=conv_punc,
+                                          temperature=temperature, top_p=top_p,
+                                          repetition_penalty=repetition_penalty,
+                                          subtalker_temperature=subtalker_temperature,
+                                          status_callback=lambda m: print(f"UI: {m}")):
                     if isinstance(status, str):
                         last_status = status
                         yield None, "", gr.update(visible=False), status
@@ -218,6 +223,17 @@ def create_app():
                     with gr.Row():
                         gen_srt = gr.Checkbox(label="Generate Subtitles", value=True)
                         conv_punc = gr.Checkbox(label="Smart Punctuation", value=True)
+                    with gr.Accordion("Advanced TTS Settings", open=False):
+                        with gr.Row():
+                            temperature = gr.Slider(minimum=0.0, maximum=1.5, value=0.8, step=0.05,
+                                                    label="Temperature", info="Controls randomness. Blog rec: 0.8")
+                            top_p = gr.Slider(minimum=0.0, maximum=1.0, value=0.9, step=0.05,
+                                              label="Top P", info="Nucleus sampling threshold. Blog rec: 0.9")
+                        with gr.Row():
+                            repetition_penalty = gr.Slider(minimum=1.0, maximum=2.0, value=1.1, step=0.05,
+                                                           label="Repetition Penalty", info="Reduces repetition. Blog rec: 1.1")
+                            subtalker_temperature = gr.Slider(minimum=0.0, maximum=1.5, value=0.8, step=0.05,
+                                                              label="Subtalker Temperature", info="For secondary voice tokens")
                     btn = gr.Button("Generate Audio", variant="primary", size="lg")
                     zip_out = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
@@ -242,7 +258,8 @@ def create_app():
 
             btn.click(
                 on_clone,
-                inputs=[input_text, r1_name, r1_audio, r1_text, r2_name, r2_audio, r2_text, r3_name, r3_audio, r3_text, gen_srt, conv_punc],
+                inputs=[input_text, r1_name, r1_audio, r1_text, r2_name, r2_audio, r2_text, r3_name, r3_audio, r3_text,
+                        gen_srt, conv_punc, temperature, top_p, repetition_penalty, subtalker_temperature],
                 outputs=[audio_out, srt_out, zip_out, status_out]
             )
 
