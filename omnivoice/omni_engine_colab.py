@@ -3,6 +3,8 @@ import gc
 import time
 import soundfile as sf
 import tempfile
+import os
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 from qwen_tts import Qwen3TTSModel
 
 # Global variables
