@@ -3,6 +3,5 @@ torchaudio
 gradio
 huggingface_hub
 qwen-tts
-qwen-asr
 accelerate
 soundfile
