@@ -26,11 +26,20 @@ custom_css = """
     font-family: monospace;
 }
 .panel-spacer {
-    margin-top: 10px !important;
+    margin-top: 5px !important;
 }
-.inline-button {
+.merged-row {
+    gap: 0 !important;
+}
+.merged-row .gr-textbox {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+.merged-row .gr-button {
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-left: none !important;
     min-width: 80px !important;
-    flex: 0 0 auto !important;
 }
 """
 
@@ -176,10 +185,10 @@ def create_app():
 
                     def _role_panel(label, open_=True, name_ph="e.g. Alex"):
                         with gr.Accordion(label, open=open_):
-                            with gr.Row(variant="compact"):
+                            with gr.Row(variant="compact", elem_classes="merged-row"):
                                 rname = gr.Textbox(label="Role Name", placeholder=name_ph, value="", scale=4)
                                 rload = gr.UploadButton("Load Role", file_types=[".qwen3tts"],
-                                                        variant="secondary", size="sm", scale=1, elem_classes="inline-button")
+                                                        variant="secondary", size="sm", scale=1)
                             
                             with gr.Column(visible=True) as extra_fields:
                                 raudio = gr.Audio(label="Reference Audio", type="filepath")
@@ -201,10 +210,8 @@ def create_app():
 
                 with gr.Column():
                     audio_out  = gr.Audio(label="Generated Speech")
-                    with gr.Group():
-                        srt_out    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    with gr.Group(elem_classes="panel-spacer"):
-                        status_out = gr.Textbox(label="Status", value="", interactive=False, lines=2)
+                    srt_out    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    status_out = gr.Textbox(label="Status", value="", interactive=False, lines=2, elem_classes="panel-spacer")
                     temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc = _adv_accordion()
                     btn     = gr.Button("Generate Audio", variant="primary", size="lg")
                     zip_out = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
@@ -247,10 +254,8 @@ def create_app():
                     custom_btn = gr.Button("Generate Audio", variant="primary", size="lg")
                 with gr.Column():
                     custom_audio  = gr.Audio(label="Generated Speech")
-                    with gr.Group():
-                        custom_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    with gr.Group(elem_classes="panel-spacer"):
-                        custom_status = gr.Textbox(label="Status", interactive=False, lines=2)
+                    custom_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    custom_status = gr.Textbox(label="Status", interactive=False, lines=2, elem_classes="panel-spacer")
                     custom_zip    = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
             def on_custom(text, name, instr, temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc):
@@ -308,10 +313,8 @@ def create_app():
                     design_btn = gr.Button("Generate Audio", variant="primary", size="lg")
                 with gr.Column():
                     design_audio  = gr.Audio(label="Generated Speech")
-                    with gr.Group():
-                        design_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    with gr.Group(elem_classes="panel-spacer"):
-                        design_status = gr.Textbox(label="Status", interactive=False, lines=2)
+                    design_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                    design_status = gr.Textbox(label="Status", interactive=False, lines=2, elem_classes="panel-spacer")
                     design_zip    = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
             def on_design(text, desc, temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc):
@@ -373,9 +376,8 @@ def create_app():
                         maker_zip   = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="primary", size="sm")
                         maker_txt   = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="primary", size="sm")
                         maker_clear = gr.Button("Clear", variant="secondary", size="sm")
-                    with gr.Row(variant="compact"):
-                        maker_name    = gr.Textbox(label="Role Name (used as filename)", placeholder="e.g. Natasha", scale=4)
-                        maker_compile = gr.Button("COMPILE TO .QWEN3TTS", variant="primary", size="sm", scale=1, elem_classes="inline-button")
+                    maker_name    = gr.Textbox(label="Role Name (used as filename)", placeholder="e.g. Natasha")
+                    maker_compile = gr.Button("Compile", variant="primary", size="lg")
 
                 with gr.Column():
                     maker_download = gr.File(label="Download Compiled Voice (.qwen3tts)")
