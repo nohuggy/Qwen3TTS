@@ -158,14 +158,14 @@ def create_app():
                         lines=6
                     )
                     
-                    gr.Markdown("#### Role 1 (Primary)")
-                    r1_name = gr.Textbox(label="Role Name", placeholder="e.g. Alex", value="")
-                    r1_audio = gr.Audio(label="Reference Audio", type="filepath")
-                    r1_text = gr.Textbox(label="Reference Transcript", placeholder="Text from the audio...")
-                    with gr.Row():
-                        r1_trans_btn = gr.Button("Trans Ref", variant="primary", size="sm")
-                        r1_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="primary", size="sm")
-                        r1_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="primary", size="sm")
+                    with gr.Accordion("Role 1 (Primary)", open=True):
+                        r1_name = gr.Textbox(label="Role Name", placeholder="e.g. Alex", value="")
+                        r1_audio = gr.Audio(label="Reference Audio", type="filepath")
+                        r1_text = gr.Textbox(label="Reference Transcript", placeholder="Text from the audio...")
+                        with gr.Row():
+                            r1_trans_btn = gr.Button("Trans Ref", variant="primary", size="sm")
+                            r1_zip_btn = gr.UploadButton("Ref Zip", file_types=[".zip"], variant="primary", size="sm")
+                            r1_txt_btn = gr.UploadButton("Ref Txt", file_types=[".txt"], variant="primary", size="sm")
                     
                     with gr.Accordion("Role 2", open=False):
                         r2_name = gr.Textbox(label="Role Name", placeholder="e.g. Sara")
