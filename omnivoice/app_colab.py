@@ -29,17 +29,25 @@ custom_css = """
     gap: 0 !important;
     align-items: flex-end !important;
 }
-.merged-row > .gr-form {
+/* Visual merger for Load Role button */
+.merged-row .gr-form {
     border-top-right-radius: 0 !important;
     border-bottom-right-radius: 0 !important;
     border-right: none !important;
 }
-.merged-row > .gr-button {
+.merged-row .gr-button {
     border-top-left-radius: 0 !important;
     border-bottom-left-radius: 0 !important;
-    min-width: 100px !important;
+    border-left: none !important;
     height: 42px !important;
     margin-bottom: 0 !important;
+    min-width: 100px !important;
+}
+/* Ensure textbox internal borders are also removed */
+.merged-row .gr-form > div {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-right: none !important;
 }
 """
 
@@ -211,7 +219,7 @@ def create_app():
                 with gr.Column():
                     audio_out  = gr.Audio(label="Generated Speech")
                     srt_out    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    gr.Spacer(height=10)
+                    gr.HTML('<div style="height: 10px;"></div>')
                     status_out = gr.Textbox(label="Status", value="", interactive=False, lines=2)
                     temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc = _adv_accordion()
                     btn     = gr.Button("Generate Audio", variant="primary", size="lg")
@@ -256,7 +264,7 @@ def create_app():
                 with gr.Column():
                     custom_audio  = gr.Audio(label="Generated Speech")
                     custom_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    gr.Spacer(height=10)
+                    gr.HTML('<div style="height: 10px;"></div>')
                     custom_status = gr.Textbox(label="Status", interactive=False, lines=2)
                     custom_zip    = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
@@ -316,7 +324,7 @@ def create_app():
                 with gr.Column():
                     design_audio  = gr.Audio(label="Generated Speech")
                     design_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
-                    gr.Spacer(height=10)
+                    gr.HTML('<div style="height: 10px;"></div>')
                     design_status = gr.Textbox(label="Status", interactive=False, lines=2)
                     design_zip    = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
