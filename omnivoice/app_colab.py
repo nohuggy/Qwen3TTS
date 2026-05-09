@@ -126,6 +126,7 @@ def create_app():
                 # we need to make the engine functions generators 
                 # or handle updates differently.
                 tts_start = time.time()
+                audio_path = None
                 last_status = ""
                 for status in voice_clone(text, audio, transcript, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}")):
                     if isinstance(status, str):
@@ -199,6 +200,7 @@ def create_app():
                 start_time = time.time()
                 # Phase 1: Audio
                 tts_start = time.time()
+                audio_path = None
                 last_status = ""
                 for status in custom_voice(text, name, instr, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}")):
                     if isinstance(status, str):
@@ -261,6 +263,7 @@ def create_app():
                 start_time = time.time()
                 # Phase 1: Audio
                 tts_start = time.time()
+                audio_path = None
                 last_status = ""
                 for status in voice_design(text, desc, gen_srt=False, convert_punc=conv_punc, status_callback=lambda m: print(f"UI: {m}")):
                     if isinstance(status, str):
