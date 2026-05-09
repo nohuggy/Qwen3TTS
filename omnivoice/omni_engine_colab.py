@@ -159,8 +159,8 @@ def get_slug(text, max_tokens=8):
             res += curr
     return res.strip()
 
-def smart_balanced_split(text, target_words=10, max_words=15):
-    """Split original text into readable segments for subtitles"""
+def smart_balanced_split(text, target_words=14, max_words=22):
+    """Split original text into readable segments for subtitles (Optimized for semantic units)"""
     if not text: return []
     # Split into paragraphs first
     paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
@@ -192,7 +192,7 @@ def smart_balanced_split(text, target_words=10, max_words=15):
                 t = tkns[idx - 1]
                 p = abs(offset) * 4 + p_orphan
                 if any(x in t for x in "。！？.!?;；…"): p -= 80
-                elif any(x in t for x in "，,"): p -= 40
+                elif any(x in t for x in "，,、"): p -= 40
                 elif any(x in t for x in "”’」』"): p -= 20
                 else: p += 40
                 if p < min_p:
