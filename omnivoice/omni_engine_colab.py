@@ -980,9 +980,17 @@ def generate_srt(text, audio_path, total_start_time=None):
             srt_content += f"{i+1}\n{format_timestamp(start)} --> {format_timestamp(end)}\n{segment_text}\n\n"
         
         print("✅ SRT generated successfully")
+        
+        # Crucial: Clear local references before calling global unload
+        # Otherwise the model object stays in memory until this generator finishes
+        del model
+        if 'results' in locals():
+            del results
+            
         unload_aligner()
         yield srt_content.strip()
     except Exception as e:
         print(f"❌ SRT Generation Error: {e}")
+        if 'model' in locals(): del model
         unload_aligner()
         yield f"SRT Error: {e}"
