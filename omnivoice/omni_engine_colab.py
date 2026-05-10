@@ -12,6 +12,8 @@ import difflib
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 from qwen_tts import Qwen3TTSModel
 import ctypes
+import random
+import numpy as np
 
 def trim_memory():
     """Force OS to reclaim memory. Crucial for Colab/Linux environments."""
@@ -415,11 +417,18 @@ def compile_role(audio_path, transcript, role_name, status_callback=None):
 
 
 def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
-                temperature=0.8, top_p=0.9, repetition_penalty=1.1,
-                subtalker_temperature=0.8, status_callback=None):
+                temperature=1.0, top_p=1.0, repetition_penalty=1.1,
+                seed=42, status_callback=None):
     """Generate speech using a Role Bank and script tags (## Name ##, [pause], [emotion])"""
+    # Set seeds
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+
     # Log advanced params
-    print(f"🎛️ Advanced params — temp={temperature}, top_p={top_p}, rep_pen={repetition_penalty}, sub_temp={subtalker_temperature}")
+    print(f"🎛️ Advanced params — temp={temperature}, top_p={top_p}, rep_pen={repetition_penalty}, seed={seed}")
     if not text or not role_bank_data:
         return None, ""
     
@@ -517,7 +526,7 @@ def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
                                 temperature=temperature,
                                 top_p=top_p,
                                 repetition_penalty=repetition_penalty,
-                                subtalker_temperature=subtalker_temperature,
+                                subtalker_temperature=0.8, # Internal default
                             )
                         except TypeError:
                             # Older qwen_tts without advanced params — fall back silently
@@ -615,9 +624,16 @@ def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
         yield msg
 
 def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=False,
-                 temperature=0.8, top_p=0.9, repetition_penalty=1.1,
-                 subtalker_temperature=0.8, status_callback=None):
+                 temperature=1.0, top_p=1.0, repetition_penalty=1.1,
+                 seed=42, status_callback=None):
     """Generate speech using preset voices with chunk awareness"""
+    # Set seeds
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+
     if not text:
         return None, ""
 
@@ -663,7 +679,7 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
                         temperature=temperature,
                         top_p=top_p,
                         repetition_penalty=repetition_penalty,
-                        subtalker_temperature=subtalker_temperature,
+                        subtalker_temperature=0.8,
                     )
                 except TypeError:
                     wavs, sr = model.generate_custom_voice(
@@ -713,9 +729,16 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
         yield msg
 
 def voice_design(text, voice_description, gen_srt=False, convert_punc=False,
-                 temperature=0.8, top_p=0.9, repetition_penalty=1.1,
-                 subtalker_temperature=0.8, status_callback=None):
+                 temperature=1.0, top_p=1.0, repetition_penalty=1.1,
+                 seed=42, status_callback=None):
     """Generate speech from text description with chunk awareness"""
+    # Set seeds
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+
     if not text or not voice_description:
         return None, ""
 
@@ -759,7 +782,7 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False,
                         temperature=temperature,
                         top_p=top_p,
                         repetition_penalty=repetition_penalty,
-                        subtalker_temperature=subtalker_temperature,
+                        subtalker_temperature=0.8,
                     )
                 except TypeError:
                     wavs, sr = model.generate_voice_design(

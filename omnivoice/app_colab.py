@@ -71,23 +71,24 @@ def package_zip(text, audio_path, srt_content):
     return zip_path
 
 def _adv_accordion():
-    """Returns (temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc)
+    """Returns (temperature, top_p, repetition_penalty, seed, random_seed, gen_srt, conv_punc)
     inside a collapsed Advanced TTS Settings accordion. Reused across tabs."""
     with gr.Accordion("Advanced TTS Settings", open=False):
         with gr.Row():
-            temperature = gr.Slider(0.0, 1.5, value=0.8, step=0.05, label="Temperature",
-                                    info="Controls randomness. Rec: 0.8")
-            top_p = gr.Slider(0.0, 1.0, value=0.9, step=0.05, label="Top P",
-                              info="Nucleus sampling. Rec: 0.9")
+            temperature = gr.Slider(0.0, 1.5, value=1.0, step=0.05, label="Temperature",
+                                    info="Controls randomness. Default: 1.0")
+            top_p = gr.Slider(0.0, 1.0, value=1.0, step=0.05, label="Top P",
+                              info="Nucleus sampling. Default: 1.0")
         with gr.Row():
             repetition_penalty = gr.Slider(1.0, 2.0, value=1.1, step=0.05, label="Repetition Penalty",
                                            info="Reduces repetition. Rec: 1.1")
-            subtalker_temperature = gr.Slider(0.0, 1.5, value=0.8, step=0.05, label="Subtalker Temperature",
-                                              info="Secondary voice tokens")
+            with gr.Column():
+                seed = gr.Number(label="Seed", value=42, precision=0, minimum=0)
+                random_seed = gr.Checkbox(label="Random Seed", value=False)
         with gr.Row():
             gen_srt = gr.Checkbox(label="Generate Subtitles", value=True)
             conv_punc = gr.Checkbox(label="Smart Punctuation", value=True)
-    return temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc
+    return temperature, top_p, repetition_penalty, seed, random_seed, gen_srt, conv_punc
 
 def create_app():
     with gr.Blocks(title="Qwen3-TTS", css=custom_css) as demo:
@@ -141,9 +142,14 @@ def create_app():
                          name1, audio1, text1, qwen3ts1,
                          name2, audio2, text2, qwen3ts2,
                          name3, audio3, text3, qwen3ts3,
-                         temperature, top_p, repetition_penalty, subtalker_temperature,
+                         temperature, top_p, repetition_penalty, seed, random_seed,
                          gen_srt, conv_punc):
                 start_time = time.time()
+                import random
+                used_seed = int(seed)
+                if random_seed:
+                    used_seed = random.randint(0, 2**32 - 1)
+                
                 yield None, "", gr.update(visible=False), "Initializing..."
                 role_bank_data = []
                 if audio1 or qwen3ts1:
@@ -157,10 +163,10 @@ def create_app():
                     tts_start = time.time()
                     audio_path, last_status = None, ""
                     for status in voice_clone(text, role_bank_data, gen_srt=False, convert_punc=conv_punc,
-                                            temperature=temperature, top_p=top_p,
-                                            repetition_penalty=repetition_penalty,
-                                            subtalker_temperature=subtalker_temperature,
-                                            status_callback=lambda m: print(f"UI: {m}")):
+                                          temperature=temperature, top_p=top_p,
+                                          repetition_penalty=repetition_penalty,
+                                          seed=used_seed,
+                                          status_callback=lambda m: print(f"UI: {m}")):
                         if isinstance(status, str):
                             last_status = status
                             yield None, "", gr.update(visible=False), status
@@ -234,7 +240,7 @@ def create_app():
                         srt_out    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
                     with gr.Group():
                         status_out = gr.Textbox(label="Status", value="", interactive=False, lines=2)
-                    temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc = _adv_accordion()
+                    temperature, top_p, repetition_penalty, seed, random_seed, gen_srt, conv_punc = _adv_accordion()
                     btn     = gr.Button("Generate Audio", variant="primary", size="lg")
                     zip_out = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
@@ -256,7 +262,7 @@ def create_app():
                         r1_name, r1_audio, r1_text, r1_load,
                         r2_name, r2_audio, r2_text, r2_load,
                         r3_name, r3_audio, r3_text, r3_load,
-                        temperature, top_p, repetition_penalty, subtalker_temperature,
+                        temperature, top_p, repetition_penalty, seed, random_seed,
                         gen_srt, conv_punc],
                 outputs=[audio_out, srt_out, zip_out, status_out]
             )
@@ -272,7 +278,7 @@ def create_app():
                         value="amanda")
                     custom_instr = gr.Textbox(label="Instruction",
                                               placeholder="e.g. happy, sad, whispered, shouting...", value="Standard")
-                    c_temp, c_top_p, c_rep, c_sub, c_gen_srt, c_conv_punc = _adv_accordion()
+                    c_temp, c_top_p, c_rep, c_seed, c_random_seed, c_gen_srt, c_conv_punc = _adv_accordion()
                     custom_btn = gr.Button("Generate Audio", variant="primary", size="lg")
                 with gr.Column():
                     custom_audio  = gr.Audio(label="Generated Speech")
@@ -282,17 +288,21 @@ def create_app():
                         custom_status = gr.Textbox(label="Status", interactive=False, lines=2)
                     custom_zip    = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
-            def on_custom(text, name, instr, temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc):
+            def on_custom(text, name, instr, temperature, top_p, repetition_penalty, seed, random_seed, gen_srt, conv_punc):
                 start_time = time.time()
+                import random
+                used_seed = int(seed)
+                if random_seed:
+                    used_seed = random.randint(0, 2**32 - 1)
                 yield None, "", gr.update(visible=False), "Initializing..."
                 try:
                     tts_start = time.time()
                     audio_path, last_status = None, ""
                     for status in custom_voice(text, name, instr, gen_srt=False, convert_punc=conv_punc,
-                                            temperature=temperature, top_p=top_p,
-                                            repetition_penalty=repetition_penalty,
-                                            subtalker_temperature=subtalker_temperature,
-                                            status_callback=lambda m: print(f"UI: {m}")):
+                                           temperature=temperature, top_p=top_p,
+                                           repetition_penalty=repetition_penalty,
+                                           seed=used_seed,
+                                           status_callback=lambda m: print(f"UI: {m}")):
                         if isinstance(status, str):
                             last_status = status
                             yield None, "", gr.update(visible=False), status
@@ -330,7 +340,7 @@ def create_app():
             custom_btn.click(
                 on_custom,
                 inputs=[custom_text, custom_name, custom_instr,
-                        c_temp, c_top_p, c_rep, c_sub, c_gen_srt, c_conv_punc],
+                        c_temp, c_top_p, c_rep, c_seed, c_random_seed, c_gen_srt, c_conv_punc],
                 outputs=[custom_audio, custom_srt, custom_zip, custom_status]
             )
 
@@ -343,7 +353,7 @@ def create_app():
                         label="Voice Description",
                         placeholder="e.g. A middle-aged man with a deep, raspy voice and a calm tone.",
                         lines=3)
-                    d_temp, d_top_p, d_rep, d_sub, d_gen_srt, d_conv_punc = _adv_accordion()
+                    d_temp, d_top_p, d_rep, d_seed, d_random_seed, d_gen_srt, d_conv_punc = _adv_accordion()
                     design_btn = gr.Button("Generate Audio", variant="primary", size="lg")
                 with gr.Column():
                     design_audio  = gr.Audio(label="Generated Speech")
@@ -353,8 +363,12 @@ def create_app():
                         design_status = gr.Textbox(label="Status", interactive=False, lines=2)
                     design_zip    = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
 
-            def on_design(text, desc, temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc):
+            def on_design(text, desc, temperature, top_p, repetition_penalty, seed, random_seed, gen_srt, conv_punc):
                 start_time = time.time()
+                import random
+                used_seed = int(seed)
+                if random_seed:
+                    used_seed = random.randint(0, 2**32 - 1)
                 yield None, "", gr.update(visible=False), "Initializing..."
                 try:
                     tts_start = time.time()
@@ -362,7 +376,7 @@ def create_app():
                     for status in voice_design(text, desc, gen_srt=False, convert_punc=conv_punc,
                                             temperature=temperature, top_p=top_p,
                                             repetition_penalty=repetition_penalty,
-                                            subtalker_temperature=subtalker_temperature,
+                                            seed=used_seed,
                                             status_callback=lambda m: print(f"UI: {m}")):
                         if isinstance(status, str):
                             last_status = status
@@ -401,7 +415,7 @@ def create_app():
             design_btn.click(
                 on_design,
                 inputs=[design_text, design_desc,
-                        d_temp, d_top_p, d_rep, d_sub, d_gen_srt, d_conv_punc],
+                        d_temp, d_top_p, d_rep, d_seed, d_random_seed, d_gen_srt, d_conv_punc],
                 outputs=[design_audio, design_srt, design_zip, design_status]
             )
 
