@@ -153,37 +153,47 @@ def create_app():
                 if audio3 or qwen3ts3:
                     role_bank_data.append({'name': name3, 'audio': audio3, 'text': text3, 'qwen3tts_path': qwen3ts3})
 
-                tts_start = time.time()
-                audio_path, last_status = None, ""
-                for status in voice_clone(text, role_bank_data, gen_srt=False, convert_punc=conv_punc,
-                                          temperature=temperature, top_p=top_p,
-                                          repetition_penalty=repetition_penalty,
-                                          subtalker_temperature=subtalker_temperature,
-                                          status_callback=lambda m: print(f"UI: {m}")):
-                    if isinstance(status, str):
-                        last_status = status
-                        yield None, "", gr.update(visible=False), status
-                    else:
-                        audio_path, _ = status
-                tts_dur = time.time() - tts_start
-                if not audio_path:
-                    if not last_status.startswith("❌"):
-                        yield None, gr.update(), gr.update(visible=False), "Generation failed."
-                    return
-                yield audio_path, gr.update(), gr.update(visible=False), "Audio ready. Aligning subtitles..."
-                asr_start = time.time()
-                srt = ""
-                if gen_srt:
-                    from omnivoice.omni_engine_colab import generate_srt, clean_script
-                    for status in generate_srt(clean_script(text), audio_path, total_start_time=start_time):
-                        if isinstance(status, str) and not status.startswith("1\n"):
-                            yield audio_path, gr.update(), gr.update(visible=False), status
+                try:
+                    tts_start = time.time()
+                    audio_path, last_status = None, ""
+                    for status in voice_clone(text, role_bank_data, gen_srt=False, convert_punc=conv_punc,
+                                            temperature=temperature, top_p=top_p,
+                                            repetition_penalty=repetition_penalty,
+                                            subtalker_temperature=subtalker_temperature,
+                                            status_callback=lambda m: print(f"UI: {m}")):
+                        if isinstance(status, str):
+                            last_status = status
+                            yield None, "", gr.update(visible=False), status
                         else:
-                            srt = status
-                asr_dur = time.time() - asr_start
-                total_dur = time.time() - start_time
-                perf_msg = f"Done! Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {count_words(text)}"
-                yield audio_path, srt, gr.update(value=package_zip(text, audio_path, srt), visible=True), perf_msg
+                            audio_path, _ = status
+                    
+                    tts_dur = time.time() - tts_start
+                    if not audio_path:
+                        if not last_status.startswith("❌"):
+                            yield None, gr.update(), gr.update(visible=False), "❌ Generation failed."
+                        return
+
+                    yield audio_path, gr.update(), gr.update(visible=False), "✅ Audio ready. Aligning subtitles..."
+                    
+                    asr_start = time.time()
+                    srt = ""
+                    if gen_srt:
+                        from omnivoice.omni_engine_colab import generate_srt, clean_script
+                        for status in generate_srt(clean_script(text), audio_path, total_start_time=start_time):
+                            if isinstance(status, str) and not status.startswith("1\n"):
+                                yield audio_path, gr.update(), gr.update(visible=False), status
+                            else:
+                                srt = status
+                    
+                    asr_dur = time.time() - asr_start
+                    total_dur = time.time() - start_time
+                    perf_msg = f"✅ Done! Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {count_words(text)}"
+                    print(f"UI Final: {perf_msg}")
+                    yield audio_path, srt, gr.update(value=package_zip(text, audio_path, srt), visible=True), perf_msg
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc()
+                    yield None, "", gr.update(visible=False), f"❌ Critical UI Error: {str(e)}"
 
             with gr.Row():
                 with gr.Column():
@@ -275,37 +285,47 @@ def create_app():
             def on_custom(text, name, instr, temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc):
                 start_time = time.time()
                 yield None, "", gr.update(visible=False), "Initializing..."
-                tts_start = time.time()
-                audio_path, last_status = None, ""
-                for status in custom_voice(text, name, instr, gen_srt=False, convert_punc=conv_punc,
-                                           temperature=temperature, top_p=top_p,
-                                           repetition_penalty=repetition_penalty,
-                                           subtalker_temperature=subtalker_temperature,
-                                           status_callback=lambda m: print(f"UI: {m}")):
-                    if isinstance(status, str):
-                        last_status = status
-                        yield None, "", gr.update(visible=False), status
-                    else:
-                        audio_path, _ = status
-                tts_dur = time.time() - tts_start
-                if not audio_path:
-                    if not last_status.startswith("Error"):
-                        yield None, gr.update(), gr.update(visible=False), "Generation failed."
-                    return
-                yield audio_path, gr.update(), gr.update(visible=False), "Audio ready. Aligning subtitles..."
-                asr_start = time.time()
-                srt = ""
-                if gen_srt:
-                    from omnivoice.omni_engine_colab import generate_srt, clean_script
-                    for status in generate_srt(clean_script(text), audio_path, total_start_time=start_time):
-                        if isinstance(status, str) and not status.startswith("1\n"):
-                            yield audio_path, gr.update(), gr.update(visible=False), status
+                try:
+                    tts_start = time.time()
+                    audio_path, last_status = None, ""
+                    for status in custom_voice(text, name, instr, gen_srt=False, convert_punc=conv_punc,
+                                            temperature=temperature, top_p=top_p,
+                                            repetition_penalty=repetition_penalty,
+                                            subtalker_temperature=subtalker_temperature,
+                                            status_callback=lambda m: print(f"UI: {m}")):
+                        if isinstance(status, str):
+                            last_status = status
+                            yield None, "", gr.update(visible=False), status
                         else:
-                            srt = status
-                asr_dur = time.time() - asr_start
-                total_dur = time.time() - start_time
-                perf_msg = f"Done! Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {count_words(text)}"
-                yield audio_path, srt, gr.update(value=package_zip(text, audio_path, srt), visible=True), perf_msg
+                            audio_path, _ = status
+                    
+                    tts_dur = time.time() - tts_start
+                    if not audio_path:
+                        if not last_status.startswith("Error"):
+                            yield None, gr.update(), gr.update(visible=False), "❌ Generation failed."
+                        return
+
+                    yield audio_path, gr.update(), gr.update(visible=False), "✅ Audio ready. Aligning subtitles..."
+                    
+                    asr_start = time.time()
+                    srt = ""
+                    if gen_srt:
+                        from omnivoice.omni_engine_colab import generate_srt, clean_script
+                        for status in generate_srt(clean_script(text), audio_path, total_start_time=start_time):
+                            if isinstance(status, str) and not status.startswith("1\n"):
+                                yield audio_path, gr.update(), gr.update(visible=False), status
+                            else:
+                                srt = status
+                    
+                    asr_dur = time.time() - asr_start
+                    total_dur = time.time() - start_time
+                    perf_msg = f"✅ Done! Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {count_words(text)}"
+                    print(f"UI Final: {perf_msg}")
+                    yield audio_path, srt, gr.update(value=package_zip(text, audio_path, srt), visible=True), perf_msg
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc()
+                    yield None, "", gr.update(visible=False), f"❌ Critical UI Error: {str(e)}"
 
             custom_btn.click(
                 on_custom,
@@ -336,37 +356,47 @@ def create_app():
             def on_design(text, desc, temperature, top_p, repetition_penalty, subtalker_temperature, gen_srt, conv_punc):
                 start_time = time.time()
                 yield None, "", gr.update(visible=False), "Initializing..."
-                tts_start = time.time()
-                audio_path, last_status = None, ""
-                for status in voice_design(text, desc, gen_srt=False, convert_punc=conv_punc,
-                                           temperature=temperature, top_p=top_p,
-                                           repetition_penalty=repetition_penalty,
-                                           subtalker_temperature=subtalker_temperature,
-                                           status_callback=lambda m: print(f"UI: {m}")):
-                    if isinstance(status, str):
-                        last_status = status
-                        yield None, "", gr.update(visible=False), status
-                    else:
-                        audio_path, _ = status
-                tts_dur = time.time() - tts_start
-                if not audio_path:
-                    if not last_status.startswith("Error"):
-                        yield None, gr.update(), gr.update(visible=False), "Generation failed."
-                    return
-                yield audio_path, gr.update(), gr.update(visible=False), "Audio ready. Aligning subtitles..."
-                asr_start = time.time()
-                srt = ""
-                if gen_srt:
-                    from omnivoice.omni_engine_colab import generate_srt, clean_script
-                    for status in generate_srt(clean_script(text), audio_path, total_start_time=start_time):
-                        if isinstance(status, str) and not status.startswith("1\n"):
-                            yield audio_path, gr.update(), gr.update(visible=False), status
+                try:
+                    tts_start = time.time()
+                    audio_path, last_status = None, ""
+                    for status in voice_design(text, desc, gen_srt=False, convert_punc=conv_punc,
+                                            temperature=temperature, top_p=top_p,
+                                            repetition_penalty=repetition_penalty,
+                                            subtalker_temperature=subtalker_temperature,
+                                            status_callback=lambda m: print(f"UI: {m}")):
+                        if isinstance(status, str):
+                            last_status = status
+                            yield None, "", gr.update(visible=False), status
                         else:
-                            srt = status
-                asr_dur = time.time() - asr_start
-                total_dur = time.time() - start_time
-                perf_msg = f"Done! Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {count_words(text)}"
-                yield audio_path, srt, gr.update(value=package_zip(text, audio_path, srt), visible=True), perf_msg
+                            audio_path, _ = status
+                    
+                    tts_dur = time.time() - tts_start
+                    if not audio_path:
+                        if not last_status.startswith("Error"):
+                            yield None, gr.update(), gr.update(visible=False), "❌ Generation failed."
+                        return
+
+                    yield audio_path, gr.update(), gr.update(visible=False), "✅ Audio ready. Aligning subtitles..."
+                    
+                    asr_start = time.time()
+                    srt = ""
+                    if gen_srt:
+                        from omnivoice.omni_engine_colab import generate_srt, clean_script
+                        for status in generate_srt(clean_script(text), audio_path, total_start_time=start_time):
+                            if isinstance(status, str) and not status.startswith("1\n"):
+                                yield audio_path, gr.update(), gr.update(visible=False), status
+                            else:
+                                srt = status
+                    
+                    asr_dur = time.time() - asr_start
+                    total_dur = time.time() - start_time
+                    perf_msg = f"✅ Done! Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {count_words(text)}"
+                    print(f"UI Final: {perf_msg}")
+                    yield audio_path, srt, gr.update(value=package_zip(text, audio_path, srt), visible=True), perf_msg
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc()
+                    yield None, "", gr.update(visible=False), f"❌ Critical UI Error: {str(e)}"
 
             design_btn.click(
                 on_design,
