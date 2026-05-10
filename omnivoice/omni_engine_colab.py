@@ -20,7 +20,7 @@ ALIGNER_PIPE = None
 
 # Device detection
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
-DTYPE = torch.float16 if torch.cuda.is_available() else torch.float32
+DTYPE = torch.float16 if torch.cuda.is_available() else torch.bfloat16
 
 # Enable PyTorch optimizations if GPU is available
 if torch.cuda.is_available():
@@ -73,9 +73,10 @@ def load_model(model_type):
         current_model = None
         current_model_type = None
         gc.collect()
+        gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        time.sleep(1) # Breathe
+        time.sleep(2) # Breathe room for RAM reclamation
 
     # Ensure ASR and Aligner are unloaded before loading TTS
     unload_asr()
@@ -96,7 +97,8 @@ def load_model(model_type):
             model_name,
             torch_dtype=DTYPE,
             device_map=DEVICE,
-            attn_implementation="sdpa" if torch.cuda.is_available() else "eager"
+            attn_implementation="sdpa" if torch.cuda.is_available() else "eager",
+            low_cpu_mem_usage=True
         )
 
         current_model_type = model_type
@@ -801,8 +803,10 @@ def get_asr_pipe():
             current_model = None
             current_model_type = None
             gc.collect()
+            gc.collect() # Double collection to be sure
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+            time.sleep(1) # Breathe
         
         try:
             from qwen_asr import Qwen3ASRModel
@@ -810,7 +814,8 @@ def get_asr_pipe():
                 "Qwen/Qwen3-ASR-0.6B",
                 dtype=DTYPE,
                 device_map=DEVICE,
-                attn_implementation="sdpa" if torch.cuda.is_available() else "eager"
+                attn_implementation="sdpa" if torch.cuda.is_available() else "eager",
+                low_cpu_mem_usage=True
             )
             print("✅ ASR model loaded")
         except Exception as e:
@@ -823,7 +828,8 @@ def get_asr_pipe():
                     model="Qwen/Qwen3-ASR-0.6B",
                     device=DEVICE,
                     torch_dtype=DTYPE,
-                    trust_remote_code=True
+                    trust_remote_code=True,
+                    model_kwargs={"low_cpu_mem_usage": True}
                 )
                 print("✅ ASR model loaded (Pipeline Fallback)")
             except Exception as e2:
@@ -872,9 +878,10 @@ def get_aligner_pipe():
             current_model = None
             current_model_type = None
             gc.collect()
+            gc.collect() # Double collection
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-            time.sleep(1) # Breathe
+            time.sleep(2) # Extra breathing room for OS
         unload_asr()
         
         try:
@@ -890,7 +897,8 @@ def get_aligner_pipe():
                 dtype=DTYPE,
                 device_map=DEVICE,
                 forced_aligner="Qwen/Qwen3-ForcedAligner-0.6B",
-                attn_implementation="sdpa" if torch.cuda.is_available() else "eager"
+                attn_implementation="sdpa" if torch.cuda.is_available() else "eager",
+                low_cpu_mem_usage=True
             )
             print("✅ Forced Aligner loaded")
         except Exception as e:
