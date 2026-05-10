@@ -20,7 +20,7 @@ ALIGNER_PIPE = None
 
 # Device detection
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
-DTYPE = torch.float16 if torch.cuda.is_available() else torch.bfloat16
+DTYPE = torch.float16 if torch.cuda.is_available() else torch.float32
 
 # Enable PyTorch optimizations if GPU is available
 if torch.cuda.is_available():
