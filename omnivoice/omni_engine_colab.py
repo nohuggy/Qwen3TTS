@@ -11,6 +11,19 @@ import re
 import difflib
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 from qwen_tts import Qwen3TTSModel
+import ctypes
+
+def trim_memory():
+    """Force OS to reclaim memory. Crucial for Colab/Linux environments."""
+    gc.collect()
+    gc.collect()
+    try:
+        libc = ctypes.CDLL("libc.so.6")
+        libc.malloc_trim(0)
+    except Exception:
+        pass
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 # Global variables
 current_model = None
@@ -72,10 +85,7 @@ def load_model(model_type):
         del current_model
         current_model = None
         current_model_type = None
-        gc.collect()
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        trim_memory()
         time.sleep(2) # Breathe room for RAM reclamation
 
     # Ensure ASR and Aligner are unloaded before loading TTS
@@ -802,10 +812,7 @@ def get_asr_pipe():
             del current_model
             current_model = None
             current_model_type = None
-            gc.collect()
-            gc.collect() # Double collection to be sure
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            trim_memory()
             time.sleep(1) # Breathe
         
         try:
@@ -844,9 +851,7 @@ def unload_asr():
         print("🗑️ Unloading ASR Engine...")
         del ASR_PIPE
         ASR_PIPE = None
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        trim_memory()
 
 def transcribe_ref(audio_path):
     """Transcribe reference audio using Qwen3-ASR"""
@@ -877,10 +882,7 @@ def get_aligner_pipe():
             del current_model
             current_model = None
             current_model_type = None
-            gc.collect()
-            gc.collect() # Double collection
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            trim_memory()
             time.sleep(2) # Extra breathing room for OS
         unload_asr()
         
@@ -913,9 +915,7 @@ def unload_aligner():
         print("🗑️ Unloading Aligner Engine...")
         del ALIGNER_PIPE
         ALIGNER_PIPE = None
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        trim_memory()
 
 import concurrent.futures
 
