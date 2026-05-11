@@ -292,7 +292,7 @@ def create_app():
                         choices=['aiden', 'dylan', 'eric', 'ono_anna', 'ryan', 'serena', 'sohee', 'uncle_fu', 'vivian'],
                         value="aiden")
                     custom_instr = gr.Textbox(label="Instruction",
-                                              placeholder="e.g. happy, sad, whispered, shouting...", value="Standard")
+                                              placeholder="e.g. happy, sad, whispered, shouting...", value="")
                     c_temp, c_top_p, c_top_k, c_rep, c_seed, c_random_seed, c_gen_srt, c_conv_punc = _adv_accordion(srt_val=False, punc_val=False)
                     custom_btn = gr.Button("Generate Audio", variant="primary", size="lg")
                 with gr.Column():
