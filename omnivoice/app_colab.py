@@ -284,8 +284,8 @@ def create_app():
                     custom_btn = gr.Button("Generate Audio", variant="primary", size="lg")
                 with gr.Column():
                     custom_audio  = gr.Audio(label="Generated Speech")
-                    with gr.Group():
-                        custom_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False, visible=False)
+                    with gr.Group(visible=False) as custom_srt_group:
+                        custom_srt = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
                     with gr.Group():
                         custom_status = gr.Textbox(label="Status", interactive=False, lines=2)
                     custom_zip    = gr.DownloadButton("Download", visible=False)
@@ -347,7 +347,7 @@ def create_app():
                         c_temp, c_top_p, c_top_k, c_rep, c_seed, c_random_seed, c_gen_srt, c_conv_punc],
                 outputs=[custom_audio, custom_srt, custom_zip, custom_status, c_seed]
             )
-            c_gen_srt.change(lambda x: gr.update(visible=x), inputs=[c_gen_srt], outputs=[custom_srt])
+            c_gen_srt.change(lambda x: gr.update(visible=x), inputs=[c_gen_srt], outputs=[custom_srt_group])
 
         # ── VOICE DESIGN TAB ───────────────────────────────────────────────────
         with gr.Tab("Voice Design"):
@@ -362,8 +362,8 @@ def create_app():
                     design_btn = gr.Button("Generate Audio", variant="primary", size="lg")
                 with gr.Column():
                     design_audio  = gr.Audio(label="Generated Speech")
-                    with gr.Group():
-                        design_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False, visible=False)
+                    with gr.Group(visible=False) as design_srt_group:
+                        design_srt = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
                     with gr.Group():
                         design_status = gr.Textbox(label="Status", interactive=False, lines=2)
                     design_zip    = gr.DownloadButton("Download", visible=False)
@@ -425,7 +425,7 @@ def create_app():
                         d_temp, d_top_p, d_top_k, d_rep, d_seed, d_random_seed, d_gen_srt, d_conv_punc],
                 outputs=[design_audio, design_srt, design_zip, design_status, d_seed]
             )
-            d_gen_srt.change(lambda x: gr.update(visible=x), inputs=[d_gen_srt], outputs=[design_srt])
+            d_gen_srt.change(lambda x: gr.update(visible=x), inputs=[d_gen_srt], outputs=[design_srt_group])
 
         # ── ROLE MAKER TAB ─────────────────────────────────────────────────────
         with gr.Tab("Role Maker"):
