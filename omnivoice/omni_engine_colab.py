@@ -256,7 +256,7 @@ def align_robust(user_segments, aligner_tokens):
             
     user_full_clean = "".join(user_clean)
     aligner_clean = "".join([re.sub(r'[^\w\u4e00-\u9fff]', '', c.text).lower() for c in aligner_tokens])
-    matcher = difflib.SequenceMatcher(None, user_full_clean, aligner_clean)
+    matcher = difflib.SequenceMatcher(None, user_full_clean, aligner_clean, autojunk=False)
     
     mapping = [None] * len(user_full_clean)
     for u_s, w_s, length in matcher.get_matching_blocks():
