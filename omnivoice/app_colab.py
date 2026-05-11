@@ -250,7 +250,7 @@ def create_app():
 
                 with gr.Column():
                     audio_out  = gr.Audio(label="Generated Speech")
-                    with gr.Group():
+                    with gr.Group(visible=True) as clone_srt_group:
                         srt_out    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
                     with gr.Group():
                         status_out = gr.Textbox(label="Status", value="", interactive=False, lines=2)
@@ -280,6 +280,7 @@ def create_app():
                         gen_srt, conv_punc],
                 outputs=[audio_out, srt_out, zip_out, status_out, seed]
             )
+            gen_srt.change(lambda x: gr.update(visible=x), inputs=[gen_srt], outputs=[clone_srt_group])
 
         # ── CUSTOM VOICE TAB ───────────────────────────────────────────────────
         with gr.Tab("Custom Voice"):
