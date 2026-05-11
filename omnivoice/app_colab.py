@@ -289,8 +289,8 @@ def create_app():
                     custom_text = gr.Textbox(label="Input Text", placeholder="Enter text...", lines=6)
                     custom_name = gr.Dropdown(
                         label="Character Voice",
-                        choices=["amanda", "denis", "jessica", "kevin", "lewis", "pippa", "stella", "tess", "vivienne"],
-                        value="amanda")
+                        choices=['aiden', 'dylan', 'eric', 'ono_anna', 'ryan', 'serena', 'sohee', 'uncle_fu', 'vivian'],
+                        value="aiden")
                     custom_instr = gr.Textbox(label="Instruction",
                                               placeholder="e.g. happy, sad, whispered, shouting...", value="Standard")
                     c_temp, c_top_p, c_top_k, c_rep, c_seed, c_random_seed, c_gen_srt, c_conv_punc = _adv_accordion(srt_val=False, punc_val=False)
