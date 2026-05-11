@@ -85,9 +85,9 @@ def _adv_accordion(srt_val=True, punc_val=True, voice_design_mode=False):
     inside a collapsed Advanced TTS Settings accordion. Reused across tabs."""
     with gr.Accordion("Advanced TTS Settings", open=False):
         with gr.Row():
-            temperature = gr.Slider(0.0, 2.0, value=1.0, step=0.05, label="Temperature")
+            temperature = gr.Slider(0.0, 1.0, value=1.0, step=0.05, label="Temperature")
             top_p = gr.Slider(0.0, 1.0, value=1.0, step=0.05, label="Top P")
-            top_k = gr.Slider(0, 100, value=50, step=1, label="Top K")
+            top_k = gr.Slider(0, 50, value=50, step=1, label="Top K")
         with gr.Row():
             repetition_penalty = gr.Slider(1.0, 2.0, value=1.1, step=0.05, label="Repetition Penalty")
             with gr.Column():
