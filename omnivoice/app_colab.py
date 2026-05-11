@@ -52,9 +52,12 @@ custom_css = """
 }
 """
 
-def package_zip(text, audio_path, srt_content):
-    """Package audio and SRT into a ZIP for download using slug-based naming"""
+def package_output(text, audio_path, srt_content):
+    """Package audio and optionally SRT into a ZIP, or return raw audio if no SRT"""
     if not audio_path: return None
+    if not srt_content:
+        return audio_path # Return raw WAV if no subtitles
+        
     import zipfile
     from omnivoice.omni_engine_colab import get_slug
     slug = get_slug(text)
@@ -62,34 +65,29 @@ def package_zip(text, audio_path, srt_content):
     zip_path = os.path.join("outputs", f"{slug}.zip")
     with zipfile.ZipFile(zip_path, 'w') as zipf:
         zipf.write(audio_path, f"{slug}.wav")
-        if srt_content:
-            base = os.path.splitext(audio_path)[0]
-            srt_path = f"{base}.srt"
-            with open(srt_path, 'w', encoding='utf-8') as f:
-                f.write(srt_content)
-            zipf.write(srt_path, f"{slug}.srt")
+        base = os.path.splitext(audio_path)[0]
+        srt_path = f"{base}.srt"
+        with open(srt_path, 'w', encoding='utf-8') as f:
+            f.write(srt_content)
+        zipf.write(srt_path, f"{slug}.srt")
     return zip_path
 
-def _adv_accordion():
+def _adv_accordion(srt_val=True, punc_val=True):
     """Returns (temperature, top_p, top_k, repetition_penalty, seed, random_seed, gen_srt, conv_punc)
     inside a collapsed Advanced TTS Settings accordion. Reused across tabs."""
     with gr.Accordion("Advanced TTS Settings", open=False):
         with gr.Row():
-            temperature = gr.Slider(0.0, 2.0, value=1.0, step=0.05, label="Temperature",
-                                    info="Controls randomness. Default: 1.0")
-            top_p = gr.Slider(0.0, 1.0, value=1.0, step=0.05, label="Top P",
-                              info="Nucleus sampling. Default: 1.0")
-            top_k = gr.Slider(0, 100, value=50, step=1, label="Top K",
-                              info="Top-K sampling. Default: 50")
+            temperature = gr.Slider(0.0, 2.0, value=1.0, step=0.05, label="Temperature")
+            top_p = gr.Slider(0.0, 1.0, value=1.0, step=0.05, label="Top P")
+            top_k = gr.Slider(0, 100, value=50, step=1, label="Top K")
         with gr.Row():
-            repetition_penalty = gr.Slider(1.0, 2.0, value=1.1, step=0.05, label="Repetition Penalty",
-                                           info="Reduces repetition. Default: 1.1")
+            repetition_penalty = gr.Slider(1.0, 2.0, value=1.1, step=0.05, label="Repetition Penalty")
             with gr.Column():
                 seed = gr.Number(label="Seed", value=42, precision=0, minimum=0)
                 random_seed = gr.Checkbox(label="Random Seed", value=False)
         with gr.Row():
-            gen_srt = gr.Checkbox(label="Generate Subtitles", value=True)
-            conv_punc = gr.Checkbox(label="Smart Punctuation", value=True)
+            gen_srt = gr.Checkbox(label="Generate Subtitles", value=srt_val)
+            conv_punc = gr.Checkbox(label="Smart Punctuation", value=punc_val)
     return temperature, top_p, top_k, repetition_penalty, seed, random_seed, gen_srt, conv_punc
 
 def create_app():
@@ -181,7 +179,9 @@ def create_app():
                             yield None, gr.update(), gr.update(visible=False), "❌ Generation failed.", used_seed
                         return
 
-                    yield audio_path, gr.update(), gr.update(visible=False), "✅ Audio ready. Aligning subtitles...", used_seed
+                    from omnivoice.omni_engine_colab import wav_to_mp3
+                    preview_path = wav_to_mp3(audio_path)
+                    yield preview_path, gr.update(), gr.update(visible=False), "✅ Audio ready. Aligning subtitles...", used_seed
                     
                     asr_start = time.time()
                     srt = ""
@@ -189,7 +189,7 @@ def create_app():
                         from omnivoice.omni_engine_colab import generate_srt, clean_script
                         for status in generate_srt(clean_script(text), audio_path, total_start_time=start_time):
                             if isinstance(status, str) and not status.startswith("1\n"):
-                                yield audio_path, gr.update(), gr.update(visible=False), status, used_seed
+                                yield preview_path, gr.update(), gr.update(visible=False), status, used_seed
                             else:
                                 srt = status
                     
@@ -197,7 +197,7 @@ def create_app():
                     total_dur = time.time() - start_time
                     perf_msg = f"✅ Done! Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {count_words(text)} | Seed: {used_seed}"
                     print(f"UI Final: {perf_msg}")
-                    yield audio_path, srt, gr.update(value=package_zip(text, audio_path, srt), visible=True), perf_msg, used_seed
+                    yield preview_path, srt, gr.update(value=package_output(text, audio_path, srt), visible=True), perf_msg, used_seed
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
@@ -244,7 +244,7 @@ def create_app():
                         status_out = gr.Textbox(label="Status", value="", interactive=False, lines=2)
                     temperature, top_p, top_k, repetition_penalty, seed, random_seed, gen_srt, conv_punc = _adv_accordion()
                     btn     = gr.Button("Generate Audio", variant="primary", size="lg")
-                    zip_out = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
+                    zip_out = gr.DownloadButton("Download", visible=False)
 
             # Role callbacks
             for rname, rload, raudio, rtext, rtrans, rzip, rtxt, rclear, rextra in [
@@ -280,15 +280,15 @@ def create_app():
                         value="amanda")
                     custom_instr = gr.Textbox(label="Instruction",
                                               placeholder="e.g. happy, sad, whispered, shouting...", value="Standard")
-                    c_temp, c_top_p, c_top_k, c_rep, c_seed, c_random_seed, c_gen_srt, c_conv_punc = _adv_accordion()
+                    c_temp, c_top_p, c_top_k, c_rep, c_seed, c_random_seed, c_gen_srt, c_conv_punc = _adv_accordion(srt_val=False, punc_val=False)
                     custom_btn = gr.Button("Generate Audio", variant="primary", size="lg")
                 with gr.Column():
                     custom_audio  = gr.Audio(label="Generated Speech")
                     with gr.Group():
-                        custom_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                        custom_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False, visible=False)
                     with gr.Group():
                         custom_status = gr.Textbox(label="Status", interactive=False, lines=2)
-                    custom_zip    = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
+                    custom_zip    = gr.DownloadButton("Download", visible=False)
 
             def on_custom(text, name, instr, temperature, top_p, top_k, repetition_penalty, seed, random_seed, gen_srt, conv_punc):
                 start_time = time.time()
@@ -317,7 +317,9 @@ def create_app():
                             yield None, gr.update(), gr.update(visible=False), "❌ Generation failed.", used_seed
                         return
 
-                    yield audio_path, gr.update(), gr.update(visible=False), "✅ Audio ready. Aligning subtitles...", used_seed
+                    from omnivoice.omni_engine_colab import wav_to_mp3
+                    preview_path = wav_to_mp3(audio_path)
+                    yield preview_path, gr.update(), gr.update(visible=False), "✅ Audio ready. Aligning subtitles...", used_seed
                     
                     asr_start = time.time()
                     srt = ""
@@ -325,7 +327,7 @@ def create_app():
                         from omnivoice.omni_engine_colab import generate_srt, clean_script
                         for status in generate_srt(clean_script(text), audio_path, total_start_time=start_time):
                             if isinstance(status, str) and not status.startswith("1\n"):
-                                yield audio_path, gr.update(), gr.update(visible=False), status, used_seed
+                                yield preview_path, gr.update(), gr.update(visible=False), status, used_seed
                             else:
                                 srt = status
                     
@@ -333,7 +335,7 @@ def create_app():
                     total_dur = time.time() - start_time
                     perf_msg = f"✅ Done! Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {count_words(text)} | Seed: {used_seed}"
                     print(f"UI Final: {perf_msg}")
-                    yield audio_path, srt, gr.update(value=package_zip(text, audio_path, srt), visible=True), perf_msg, used_seed
+                    yield preview_path, srt, gr.update(value=package_output(text, audio_path, srt), visible=True), perf_msg, used_seed
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
@@ -345,6 +347,7 @@ def create_app():
                         c_temp, c_top_p, c_top_k, c_rep, c_seed, c_random_seed, c_gen_srt, c_conv_punc],
                 outputs=[custom_audio, custom_srt, custom_zip, custom_status, c_seed]
             )
+            c_gen_srt.change(lambda x: gr.update(visible=x), inputs=[c_gen_srt], outputs=[custom_srt])
 
         # ── VOICE DESIGN TAB ───────────────────────────────────────────────────
         with gr.Tab("Voice Design"):
@@ -355,15 +358,15 @@ def create_app():
                         label="Voice Description",
                         placeholder="e.g. A middle-aged man with a deep, raspy voice and a calm tone.",
                         lines=3)
-                    d_temp, d_top_p, d_top_k, d_rep, d_seed, d_random_seed, d_gen_srt, d_conv_punc = _adv_accordion()
+                    d_temp, d_top_p, d_top_k, d_rep, d_seed, d_random_seed, d_gen_srt, d_conv_punc = _adv_accordion(srt_val=False, punc_val=False)
                     design_btn = gr.Button("Generate Audio", variant="primary", size="lg")
                 with gr.Column():
                     design_audio  = gr.Audio(label="Generated Speech")
                     with gr.Group():
-                        design_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False)
+                        design_srt    = gr.Textbox(label="SRT Preview", lines=6, interactive=False, visible=False)
                     with gr.Group():
                         design_status = gr.Textbox(label="Status", interactive=False, lines=2)
-                    design_zip    = gr.DownloadButton("Download ZIP (WAV + SRT)", visible=False)
+                    design_zip    = gr.DownloadButton("Download", visible=False)
 
             def on_design(text, desc, temperature, top_p, top_k, repetition_penalty, seed, random_seed, gen_srt, conv_punc):
                 start_time = time.time()
@@ -392,7 +395,9 @@ def create_app():
                             yield None, gr.update(), gr.update(visible=False), "❌ Generation failed.", used_seed
                         return
 
-                    yield audio_path, gr.update(), gr.update(visible=False), "✅ Audio ready. Aligning subtitles...", used_seed
+                    from omnivoice.omni_engine_colab import wav_to_mp3
+                    preview_path = wav_to_mp3(audio_path)
+                    yield preview_path, gr.update(), gr.update(visible=False), "✅ Audio ready. Aligning subtitles...", used_seed
                     
                     asr_start = time.time()
                     srt = ""
@@ -400,7 +405,7 @@ def create_app():
                         from omnivoice.omni_engine_colab import generate_srt, clean_script
                         for status in generate_srt(clean_script(text), audio_path, total_start_time=start_time):
                             if isinstance(status, str) and not status.startswith("1\n"):
-                                yield audio_path, gr.update(), gr.update(visible=False), status, used_seed
+                                yield preview_path, gr.update(), gr.update(visible=False), status, used_seed
                             else:
                                 srt = status
                     
@@ -408,7 +413,7 @@ def create_app():
                     total_dur = time.time() - start_time
                     perf_msg = f"✅ Done! Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {count_words(text)} | Seed: {used_seed}"
                     print(f"UI Final: {perf_msg}")
-                    yield audio_path, srt, gr.update(value=package_zip(text, audio_path, srt), visible=True), perf_msg, used_seed
+                    yield preview_path, srt, gr.update(value=package_output(text, audio_path, srt), visible=True), perf_msg, used_seed
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
@@ -420,6 +425,7 @@ def create_app():
                         d_temp, d_top_p, d_top_k, d_rep, d_seed, d_random_seed, d_gen_srt, d_conv_punc],
                 outputs=[design_audio, design_srt, design_zip, design_status, d_seed]
             )
+            d_gen_srt.change(lambda x: gr.update(visible=x), inputs=[d_gen_srt], outputs=[design_srt])
 
         # ── ROLE MAKER TAB ─────────────────────────────────────────────────────
         with gr.Tab("Role Maker"):

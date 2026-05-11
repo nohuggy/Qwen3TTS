@@ -27,6 +27,22 @@ def trim_memory():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
+def wav_to_mp3(wav_path):
+    """Convert WAV to MP3 for preview stability. Returns MP3 path."""
+    if not wav_path or not os.path.exists(wav_path):
+        return wav_path
+    try:
+        mp3_path = wav_path.replace(".wav", ".mp3")
+        # Colab usually has ffmpeg. Use it to convert.
+        import subprocess
+        # -qscale:a 2 is a good variable bitrate for MP3 (~190kbps)
+        subprocess.run(["ffmpeg", "-y", "-i", wav_path, "-codec:a", "libmp3lame", "-qscale:a", "2", mp3_path], 
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        return mp3_path
+    except Exception as e:
+        print(f"⚠️ MP3 Conversion failed: {e}. Falling back to WAV.")
+        return wav_path
+
 # Global variables
 current_model = None
 current_model_type = None
@@ -70,8 +86,7 @@ def setup_asr():
     except Exception as e:
         print(f"   ⚠️ Could not pre-warm ASR/Aligner cache: {e}")
 
-# Run setup at boot
-setup_asr()
+# setup_asr() # No longer run at boot as requested
 
 def load_model(model_type):
     """Load model with status yielding for UI"""
@@ -830,6 +845,7 @@ def get_asr_pipe():
     """Load Qwen3-ASR-0.6B model"""
     global ASR_PIPE
     if ASR_PIPE is None:
+        setup_asr() # Install/Download on first use
         print("Loading Qwen3-ASR-0.6B model...")
         # Unload TTS model first to save VRAM
         global current_model, current_model_type
@@ -900,6 +916,7 @@ def get_aligner_pipe():
     """Load Qwen3-ForcedAligner-0.6B model"""
     global ALIGNER_PIPE
     if ALIGNER_PIPE is None:
+        setup_asr() # Install/Download on first use
         print("Loading Qwen3-ForcedAligner-0.6B model...")
         # Unload TTS and ASR first to save VRAM
         global current_model, current_model_type
