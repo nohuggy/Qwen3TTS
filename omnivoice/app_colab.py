@@ -389,20 +389,19 @@ def create_app():
                 yield None, "", gr.update(visible=False), "Initializing...", used_seed
                 try:
                     tts_start = time.time()
-                    audio_path, last_status, qwen3tts_paths = None, "", []
+                    audio_path, last_status, speaker_paths = None, "", {}
                     for status in voice_design(text, desc, gen_srt=False, convert_punc=conv_punc,
                                             temperature=temperature, top_p=top_p,
                                             repetition_penalty=repetition_penalty,
                                             seed=used_seed,
-                                            status_callback=lambda m: print(f"UI: {m}"),
-                                            gen_qwen3tts=gen_qwen3tts):
+                                            status_callback=lambda m: print(f"UI: {m}")):
                         if isinstance(status, str):
                             last_status = status
                             yield None, "", gr.update(visible=False), status, used_seed
                         else:
                             audio_path = status[0]
                             if len(status) > 2:
-                                qwen3tts_paths = status[2]
+                                speaker_paths = status[2]
                     
                     tts_dur = time.time() - tts_start
                     if not audio_path:
@@ -425,6 +424,16 @@ def create_app():
                                 srt = status
                     
                     asr_dur = time.time() - asr_start
+                    
+                    qwen3tts_paths = []
+                    if gen_qwen3tts:
+                        yield preview_path, gr.update(), gr.update(visible=False), "✅ Subtitles ready. Compiling .qwen3tts voices...", used_seed
+                        from omnivoice.omni_engine_colab import compile_role, get_slug
+                        for spk, (spk_path, spk_txt) in speaker_paths.items():
+                            spk_name = get_slug(spk) if spk != "default" else get_slug(text)
+                            qwen_path, _ = compile_role(spk_path, spk_txt, spk_name, status_callback=lambda m: print(f"UI: {m}"))
+                            if qwen_path:
+                                qwen3tts_paths.append(qwen_path)
                     
                     total_dur = time.time() - start_time
                     perf_msg = f"✅ Done! Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {count_words(text)} | Seed: {used_seed}"

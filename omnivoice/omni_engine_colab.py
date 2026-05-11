@@ -747,7 +747,7 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
 
 def voice_design(text, voice_description, gen_srt=False, convert_punc=False,
                  temperature=1.0, top_p=1.0, top_k=50, repetition_penalty=1.1,
-                 seed=42, status_callback=None, gen_qwen3tts=False):
+                 seed=42, status_callback=None):
     """Generate speech from text description with chunk awareness and multi-speaker support"""
     # Set seeds
     torch.manual_seed(seed)
@@ -888,19 +888,9 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False,
 
         srt_content = ""
         if gen_srt:
-            srt_content = yield from generate_srt(text, temp_file.name)
+            srt_content = yield from generate_srt(clean_script(text), temp_file.name)
             
-        qwen3tts_files = []
-        if gen_qwen3tts:
-            yield "✅ Compiling .qwen3tts voices..."
-            # Note: compiling will load base TTS model
-            for spk, (spk_path, spk_txt) in speaker_paths.items():
-                spk_name = get_slug(spk) if spk != "default" else get_slug(text)
-                qwen_path, _ = compile_role(spk_path, spk_txt, spk_name, status_callback)
-                if qwen_path:
-                    qwen3tts_files.append(qwen_path)
-
-        yield (temp_file.name, srt_content, qwen3tts_files)
+        yield (temp_file.name, srt_content, speaker_paths)
 
     except Exception as e:
         msg = f"❌ Error in voice_design: {str(e)}"
