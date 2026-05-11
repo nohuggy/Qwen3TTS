@@ -747,8 +747,8 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
 
 def voice_design(text, voice_description, gen_srt=False, convert_punc=False,
                  temperature=1.0, top_p=1.0, top_k=50, repetition_penalty=1.1,
-                 seed=42, status_callback=None):
-    """Generate speech from text description with chunk awareness"""
+                 seed=42, status_callback=None, gen_qwen3tts=False):
+    """Generate speech from text description with chunk awareness and multi-speaker support"""
     # Set seeds
     torch.manual_seed(seed)
     if torch.cuda.is_available():
@@ -779,40 +779,92 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False,
 
         yield "Generating voice design..."
         gen_start = time.time()
+        
+        # Parse descriptions for multi-character
+        desc_segments = re.findall(r"##\s*(.*?)\s*##\s*(.*?)(?=##|$)", voice_description, re.DOTALL)
+        if desc_segments:
+            role_instructions = {name.strip(): instr.strip() for name, instr in desc_segments}
+        else:
+            role_instructions = {"default": voice_description.strip()}
+
+        # Parse text into segments handling ## Name ## and Name:
+        segments = []
+        current_speaker = "default" if not desc_segments else list(role_instructions.keys())[0]
+        current_text = []
+
+        for line in text.split('\n'):
+            line = line.strip()
+            if not line: continue
+            
+            m1 = re.match(r"^##\s*(.*?)\s*##(.*)", line)
+            if m1:
+                if current_text:
+                    segments.append((current_speaker, '\n'.join(current_text)))
+                current_speaker = m1.group(1).strip()
+                current_text = [m1.group(2).strip()] if m1.group(2).strip() else []
+                continue
+                
+            m2 = re.match(r"^([a-zA-Z0-9_\u4e00-\u9fff\s]+)[:：](.*)", line)
+            if m2:
+                if current_text:
+                    segments.append((current_speaker, '\n'.join(current_text)))
+                current_speaker = m2.group(1).strip()
+                current_text = [m2.group(2).strip()]
+                continue
+                
+            current_text.append(line)
+
+        if current_text:
+            segments.append((current_speaker, '\n'.join(current_text)))
 
         with torch.inference_mode():
-            # Chunking
-            paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
             all_wavs = []
             sr = 24000
             
-            for i, p in enumerate(paragraphs):
-                msg = f"Generating chunk {i+1}/{len(paragraphs)}..."
+            speaker_audio = {}
+            speaker_text = {}
+            
+            for i, (speaker, content) in enumerate(segments):
+                if not content.strip(): continue
+                msg = f"Generating chunk {i+1}/{len(segments)} ({speaker})..."
                 if status_callback: status_callback(msg)
                 yield msg
                 print(f"   {msg}")
                 
-                try:
-                    wavs, sr = model.generate_voice_design(
-                        text=p,
-                        instruct=voice_description,
-                        temperature=temperature,
-                        top_p=top_p,
-                        top_k=top_k,
-                        repetition_penalty=repetition_penalty,
-                        subtalker_temperature=0.8,
-                    )
-                except TypeError:
-                    wavs, sr = model.generate_voice_design(
-                        text=p,
-                        instruct=voice_description
-                    )
-                wav = wavs[0]
-                if hasattr(wav, 'cpu'):
-                    wav = wav.cpu()
-                if not isinstance(wav, torch.Tensor):
-                    wav = torch.from_numpy(wav)
-                all_wavs.append(wav)
+                instr = role_instructions.get(speaker, role_instructions.get("default", ""))
+                
+                paragraphs = [p.strip() for p in content.split('\n') if p.strip()]
+                speaker_wavs = []
+                for p in paragraphs:
+                    try:
+                        wavs, sr = model.generate_voice_design(
+                            text=p,
+                            instruct=instr,
+                            temperature=temperature,
+                            top_p=top_p,
+                            top_k=top_k,
+                            repetition_penalty=repetition_penalty,
+                            subtalker_temperature=0.8,
+                        )
+                    except TypeError:
+                        wavs, sr = model.generate_voice_design(
+                            text=p,
+                            instruct=instr
+                        )
+                    wav = wavs[0]
+                    if hasattr(wav, 'cpu'): wav = wav.cpu()
+                    if not isinstance(wav, torch.Tensor): wav = torch.from_numpy(wav)
+                    speaker_wavs.append(wav)
+                    all_wavs.append(wav)
+                    
+                if speaker not in speaker_audio:
+                    speaker_audio[speaker] = []
+                    speaker_text[speaker] = []
+                speaker_audio[speaker].extend(speaker_wavs)
+                speaker_text[speaker].append(content)
+                
+                if i < len(segments) - 1:
+                    all_wavs.append(torch.zeros(int(sr * 0.3)))
                 
             final_wav = torch.cat(all_wavs, dim=-1)
             gen_time = time.time() - gen_start
@@ -820,6 +872,14 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False,
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
         audio_data = final_wav.numpy()
         sf.write(temp_file.name, audio_data, sr)
+        
+        # Save per-speaker temp wavs for potential qwen3tts compilation
+        speaker_paths = {}
+        for spk, spk_wavs in speaker_audio.items():
+            spk_wav = torch.cat(spk_wavs, dim=-1)
+            spk_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+            sf.write(spk_file.name, spk_wav.numpy(), sr)
+            speaker_paths[spk] = (spk_file.name, "\n".join(speaker_text[spk]))
 
         total_time = time.time() - total_start
         audio_duration = len(final_wav) / sr
@@ -830,11 +890,25 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False,
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         
-        del all_wavs
+        del all_wavs, speaker_audio
         gc.collect()
         time.sleep(0.5)
 
-        yield (temp_file.name, "")
+        srt_content = ""
+        if gen_srt:
+            srt_content = yield from generate_srt(text, temp_file.name)
+            
+        qwen3tts_files = []
+        if gen_qwen3tts:
+            yield "✅ Compiling .qwen3tts voices..."
+            # Note: compiling will load base TTS model
+            for spk, (spk_path, spk_txt) in speaker_paths.items():
+                spk_name = get_slug(spk) if spk != "default" else get_slug(text)
+                qwen_path, _ = compile_role(spk_path, spk_txt, spk_name, status_callback)
+                if qwen_path:
+                    qwen3tts_files.append(qwen_path)
+
+        yield (temp_file.name, srt_content, qwen3tts_files)
 
     except Exception as e:
         msg = f"❌ Error in voice_design: {str(e)}"

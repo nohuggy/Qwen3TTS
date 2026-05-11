@@ -71,8 +71,13 @@ def package_output(text, audio_path, srt_content, qwen3tts_path=None):
             with open(srt_path, 'w', encoding='utf-8') as f:
                 f.write(srt_content)
             zipf.write(srt_path, f"{slug}.srt")
-        if qwen3tts_path and os.path.exists(qwen3tts_path):
-            zipf.write(qwen3tts_path, f"{slug}.qwen3tts")
+        if qwen3tts_path:
+            if isinstance(qwen3tts_path, list):
+                for q_path in qwen3tts_path:
+                    if os.path.exists(q_path):
+                        zipf.write(q_path, os.path.basename(q_path))
+            elif isinstance(qwen3tts_path, str) and os.path.exists(qwen3tts_path):
+                zipf.write(qwen3tts_path, f"{slug}.qwen3tts")
     return zip_path
 
 def _adv_accordion(srt_val=True, punc_val=True, voice_design_mode=False):
@@ -384,17 +389,20 @@ def create_app():
                 yield None, "", gr.update(visible=False), "Initializing...", used_seed
                 try:
                     tts_start = time.time()
-                    audio_path, last_status = None, ""
+                    audio_path, last_status, qwen3tts_paths = None, "", []
                     for status in voice_design(text, desc, gen_srt=False, convert_punc=conv_punc,
                                             temperature=temperature, top_p=top_p,
                                             repetition_penalty=repetition_penalty,
                                             seed=used_seed,
-                                            status_callback=lambda m: print(f"UI: {m}")):
+                                            status_callback=lambda m: print(f"UI: {m}"),
+                                            gen_qwen3tts=gen_qwen3tts):
                         if isinstance(status, str):
                             last_status = status
                             yield None, "", gr.update(visible=False), status, used_seed
                         else:
-                            audio_path, _ = status
+                            audio_path = status[0]
+                            if len(status) > 2:
+                                qwen3tts_paths = status[2]
                     
                     tts_dur = time.time() - tts_start
                     if not audio_path:
@@ -418,17 +426,10 @@ def create_app():
                     
                     asr_dur = time.time() - asr_start
                     
-                    qwen3tts_path = None
-                    if gen_qwen3tts:
-                        yield preview_path, gr.update(), gr.update(visible=False), "✅ Subtitles ready. Compiling .qwen3tts voice...", used_seed
-                        from omnivoice.omni_engine_colab import get_slug
-                        slug = get_slug(text)
-                        qwen3tts_path, _ = compile_role(audio_path, text, slug)
-                    
                     total_dur = time.time() - start_time
                     perf_msg = f"✅ Done! Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {count_words(text)} | Seed: {used_seed}"
                     print(f"UI Final: {perf_msg}")
-                    yield preview_path, srt, gr.update(value=package_output(text, audio_path, srt, qwen3tts_path), visible=True), perf_msg, used_seed
+                    yield preview_path, srt, gr.update(value=package_output(text, audio_path, srt, qwen3tts_paths), visible=True), perf_msg, used_seed
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
