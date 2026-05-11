@@ -787,7 +787,7 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False,
         else:
             role_instructions = {"default": voice_description.strip()}
 
-        # Parse text into segments handling ## Name ## and Name:
+        # Parse text into segments handling ## Name ##
         segments = []
         current_speaker = "default" if not desc_segments else list(role_instructions.keys())[0]
         current_text = []
@@ -802,14 +802,6 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False,
                     segments.append((current_speaker, '\n'.join(current_text)))
                 current_speaker = m1.group(1).strip()
                 current_text = [m1.group(2).strip()] if m1.group(2).strip() else []
-                continue
-                
-            m2 = re.match(r"^([a-zA-Z0-9_\u4e00-\u9fff\s]+)[:：](.*)", line)
-            if m2:
-                if current_text:
-                    segments.append((current_speaker, '\n'.join(current_text)))
-                current_speaker = m2.group(1).strip()
-                current_text = [m2.group(2).strip()]
                 continue
                 
             current_text.append(line)
