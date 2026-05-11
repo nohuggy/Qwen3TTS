@@ -52,10 +52,10 @@ custom_css = """
 }
 """
 
-def package_output(text, audio_path, srt_content, qwen3tts_path=None):
+def package_output(text, audio_path, srt_content, qwen3tts_path=None, clean_text_content=None):
     """Package audio and optionally SRT into a ZIP, or return raw audio if no SRT/qwen3tts"""
     if not audio_path: return None
-    if not srt_content and not qwen3tts_path:
+    if not srt_content and not qwen3tts_path and not clean_text_content:
         return audio_path # Return raw WAV if no subtitles and no qwen3tts
         
     import zipfile
@@ -71,6 +71,11 @@ def package_output(text, audio_path, srt_content, qwen3tts_path=None):
             with open(srt_path, 'w', encoding='utf-8') as f:
                 f.write(srt_content)
             zipf.write(srt_path, f"{slug}.srt")
+        if clean_text_content:
+            txt_path = f"{base}_clean.txt"
+            with open(txt_path, 'w', encoding='utf-8') as f:
+                f.write(clean_text_content)
+            zipf.write(txt_path, f"{slug}_clean.txt")
         if qwen3tts_path:
             if isinstance(qwen3tts_path, list):
                 for q_path in qwen3tts_path:
@@ -438,7 +443,9 @@ def create_app():
                     total_dur = time.time() - start_time
                     perf_msg = f"✅ Done! Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {count_words(text)} | Seed: {used_seed}"
                     print(f"UI Final: {perf_msg}")
-                    yield preview_path, srt, gr.update(value=package_output(text, audio_path, srt, qwen3tts_paths), visible=True), perf_msg, used_seed
+                    
+                    clean_text_val = clean_script(text) if gen_srt else None
+                    yield preview_path, srt, gr.update(value=package_output(text, audio_path, srt, qwen3tts_paths, clean_text_val), visible=True), perf_msg, used_seed
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
