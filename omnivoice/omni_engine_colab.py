@@ -417,7 +417,7 @@ def compile_role(audio_path, transcript, role_name, status_callback=None):
 
 
 def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
-                temperature=1.0, top_p=1.0, repetition_penalty=1.1,
+                temperature=1.0, top_p=1.0, top_k=50, repetition_penalty=1.1,
                 seed=42, status_callback=None):
     """Generate speech using a Role Bank and script tags (## Name ##, [pause], [emotion])"""
     # Set seeds
@@ -428,7 +428,7 @@ def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
     np.random.seed(seed)
 
     # Log advanced params
-    print(f"🎛️ Advanced params — temp={temperature}, top_p={top_p}, rep_pen={repetition_penalty}, seed={seed}")
+    print(f"🎛️ Advanced params — temp={temperature}, top_p={top_p}, top_k={top_k}, rep_pen={repetition_penalty}, seed={seed}")
     if not text or not role_bank_data:
         return None, ""
     
@@ -525,6 +525,7 @@ def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
                                 instruct=instr_arg,
                                 temperature=temperature,
                                 top_p=top_p,
+                                top_k=top_k,
                                 repetition_penalty=repetition_penalty,
                                 subtalker_temperature=0.8, # Internal default
                             )
@@ -624,7 +625,7 @@ def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
         yield msg
 
 def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=False,
-                 temperature=1.0, top_p=1.0, repetition_penalty=1.1,
+                 temperature=1.0, top_p=1.0, top_k=50, repetition_penalty=1.1,
                  seed=42, status_callback=None):
     """Generate speech using preset voices with chunk awareness"""
     # Set seeds
@@ -678,6 +679,7 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
                         instruct=instr_arg,
                         temperature=temperature,
                         top_p=top_p,
+                        top_k=top_k,
                         repetition_penalty=repetition_penalty,
                         subtalker_temperature=0.8,
                     )
@@ -729,7 +731,7 @@ def custom_voice(text, voice_name, instruction, gen_srt=False, convert_punc=Fals
         yield msg
 
 def voice_design(text, voice_description, gen_srt=False, convert_punc=False,
-                 temperature=1.0, top_p=1.0, repetition_penalty=1.1,
+                 temperature=1.0, top_p=1.0, top_k=50, repetition_penalty=1.1,
                  seed=42, status_callback=None):
     """Generate speech from text description with chunk awareness"""
     # Set seeds
@@ -740,7 +742,7 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False,
     np.random.seed(seed)
 
     if not text or not voice_description:
-        return None, "", None
+        return None, ""
 
     if convert_punc:
         text = unify_punctuation(text)
@@ -760,19 +762,8 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False,
             yield "❌ Model loading failed. Check console for details."
             return
 
-        yield "Generating voice design prompt..."
+        yield "Generating voice design..."
         gen_start = time.time()
-        
-        # Pre-generate design prompt for consistency across chunks
-        design_prompt = None
-        try:
-            design_prompt = model.create_voice_design_prompt(instruct=voice_description)
-            print("✅ Successfully pre-generated design prompt for consistency.")
-        except Exception as e:
-            print(f"⚠️ Could not pre-generate design prompt (method might not exist): {e}")
-            print("   Falling back to per-chunk generation.")
-
-        yield "Generating voice design audio..."
 
         with torch.inference_mode():
             # Chunking
@@ -787,30 +778,20 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False,
                 print(f"   {msg}")
                 
                 try:
-                    if design_prompt is not None:
-                        # Use pre-generated prompt for consistency
-                        wavs, sr = model.generate_voice_clone(
-                            text=p,
-                            voice_clone_prompt=design_prompt,
-                            temperature=temperature,
-                            top_p=top_p,
-                            repetition_penalty=repetition_penalty,
-                            subtalker_temperature=0.8,
-                        )
-                    else:
-                        # Fallback to per-chunk generation if prompt creation failed
-                        wavs, sr = model.generate_voice_design(
-                            text=p,
-                            instruct=voice_description,
-                            temperature=temperature,
-                            top_p=top_p,
-                            repetition_penalty=repetition_penalty,
-                            subtalker_temperature=0.8,
-                        )
-                except Exception as e:
-                    print(f"   Chunk generation error: {e}")
-                    # Final fallback
-                    wavs, sr = model.generate_voice_design(text=p, instruct=voice_description)
+                    wavs, sr = model.generate_voice_design(
+                        text=p,
+                        instruct=voice_description,
+                        temperature=temperature,
+                        top_p=top_p,
+                        top_k=top_k,
+                        repetition_penalty=repetition_penalty,
+                        subtalker_temperature=0.8,
+                    )
+                except TypeError:
+                    wavs, sr = model.generate_voice_design(
+                        text=p,
+                        instruct=voice_description
+                    )
                 wav = wavs[0]
                 if hasattr(wav, 'cpu'):
                     wav = wav.cpu()
@@ -838,14 +819,7 @@ def voice_design(text, voice_description, gen_srt=False, convert_punc=False,
         gc.collect()
         time.sleep(0.5)
 
-        # Save prompt to .qwen3tts if it exists
-        prompt_path = None
-        if design_prompt is not None:
-            prompt_file = tempfile.NamedTemporaryFile(delete=False, suffix=".qwen3tts")
-            torch.save(design_prompt, prompt_file.name)
-            prompt_path = prompt_file.name
-
-        yield (temp_file.name, "", prompt_path)
+        yield (temp_file.name, "")
 
     except Exception as e:
         msg = f"❌ Error in voice_design: {str(e)}"
