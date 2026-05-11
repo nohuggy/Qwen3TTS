@@ -76,6 +76,9 @@ def package_output(text, audio_path, srt_content, qwen3tts_path=None, clean_text
             with open(txt_path, 'w', encoding='utf-8') as f:
                 f.write(clean_text_content)
             zipf.write(txt_path, f"{slug}_clean.txt")
+        debug_path = os.path.join("outputs", "debug_align.txt")
+        if os.path.exists(debug_path):
+            zipf.write(debug_path, f"{slug}_debug_align.txt")
         if qwen3tts_path:
             if isinstance(qwen3tts_path, list):
                 for q_path in qwen3tts_path:

@@ -1068,6 +1068,20 @@ def generate_srt(text, audio_path, total_start_time=None):
             print("⚠️ No timestamps generated.")
             yield ""
             return
+            
+        try:
+            os.makedirs("outputs", exist_ok=True)
+            with open("outputs/debug_align.txt", "w", encoding="utf-8") as f:
+                f.write("=== ALIGNER RAW TIMESTAMPS ===\n")
+                for t in results[0].time_stamps:
+                    f.write(f"{t.start_time:.3f} - {t.end_time:.3f}: {t.text}\n")
+                f.write("\n=== CLEAN TEXT PROVIDED TO ALIGNER ===\n")
+                f.write(text)
+                f.write("\n=== USER SEGMENTS ===\n")
+                for s in user_segments:
+                    f.write(s + "\n")
+        except Exception as e:
+            print(f"Debug write failed: {e}")
         
         yield get_msg("📝 Formatting SRT...")
         # Step 3: Align original segments to timestamps
