@@ -16,38 +16,37 @@ python -m omnivoice.app_colab
 
 ## Key Features
 
-### 1. Multi-Speaker Role Bank
-*   **Concurrent Roles**: Manage up to 3 distinct speaker profiles simultaneously.
-*   **Flexible Cloning**: Define roles using Name, Reference Audio, and Transcripts.
-*   **Reliable Import**: Advanced ZIP extraction with metadata validation to prevent duration errors.
-*   **Role Management**: Individual "Clear" controls for each role to reset state and manage memory.
-
-### 2. Advanced Script Parsing
-Qwen3-TTS supports a specialized script format for professional dialogue production:
-*   **Speaker Switching**: Use `## Name ##` to switch between voices in your Role Bank.
-*   **Emotion Control**: Use `[emotion]` tags (e.g., `[shout]`, `[happy]`, `[whisper]`) to set the tone for specific segments.
-*   **Precision Pauses**: Insert `[pause:X.X]` anywhere to inject specific durations of silence.
+### 1. Multi-Speaker Voice Cloning & Design
+*   **Concurrent Roles**: Manage up to 3 distinct speaker profiles simultaneously in Voice Cloning.
+*   **Multi-Character Voice Design**: Synthesize entire multi-character dialogues purely from detailed text descriptions (Description-to-Voice).
+*   **Speaker Switching**: Use `## Name ##` to seamlessly switch between voices in both Voice Cloning and Voice Design.
+*   **Emotion & Pause Control**: Use `[emotion]` tags (e.g., `[shout]`, `[happy]`) and `[pause:X.X]` markers for granular direction.
 
 **Example Script:**
 ```text
 ## Alex ## [shout] Hey! [pause:0.5] Over here!
 ## Sara ## [happy] Oh! I see you now.
-## Bob ## [angry] Get back here!
 ```
 
-### 3. Professional Subtitle Engine (Pure SRT)
-*   **Smart Cleaning**: Automatically filters out technical metadata (role names, emotion tags, and pause markers) from generated subtitles.
-*   **Natural Splitting**: Preserves speaker boundaries and sentence structure for perfectly timed, readable SRT files.
-*   **ASR Alignment**: Uses Qwen3-ASR and Forced Aligner for word-level precision.
+### 2. Role Bank & Voice Compilation
+*   **Role Maker**: Instantly compile a reference audio clip and transcript into a highly portable `.qwen3tts` voice file.
+*   **Auto-Compilation**: Automatically extract and compile unique `.qwen3tts` profiles for each newly synthesized character directly from the Voice Design tab.
+*   **Flexible Loading**: Load `.qwen3tts` files directly into Role Bank panels without needing to re-process reference audio.
 
-### 4. Advanced Voice Modes
-*   **Custom Voice**: 9 preset studio-grade characters with high-fidelity style control.
-*   **Voice Design**: Synthesize unique voices from detailed text descriptions (Description-to-Voice).
+### 3. Professional Subtitle Engine (Pure SRT)
+*   **Perfect Word-Level Alignment**: Integrates the Qwen3-ForcedAligner-0.6B model to generate frame-accurate, word-level SRT timestamps—even across highly emotional, multi-speaker generated audio.
+*   **Smart Cleaning**: Automatically scrubs all technical metadata, structural tags, and speaker markers before forced alignment.
+*   **Natural Splitting**: Intelligently balances subtitle blocks based on sentence structure and word count for maximum readability.
+
+### 4. Advanced Production Features
+*   **Custom Voice**: 9 preset studio-grade characters (`aiden`, `dylan`, `eric`, `ono_anna`, `ryan`, `serena`, `sohee`, `uncle_fu`, `vivian`) with instruction-driven style control.
+*   **All-In-One ZIP Export**: Download your final `.wav` audio, `.srt` subtitle track, and all auto-compiled `.qwen3tts` voice profiles packaged perfectly into a single ZIP archive.
+*   **Dynamic UI**: A responsive interface that lazily loads resources to save VRAM, auto-hides inactive preview panels to reduce clutter, and provides real-time MP3 previews the moment audio synthesis completes.
 
 ## Optimization & Performance
 *   **Hardware Agnostic**: Automatic detection and optimization for CUDA (GPU) and CPU environments.
-*   **Speed**: Uses FP16, SDPA, and TF32 optimizations for maximum throughput on T4/A100 GPUs.
-*   **UI Architecture**: Minimalist, emoji-free interface with threaded background processing for a responsive user experience.
+*   **Memory Management**: Aggressive garbage collection, sequential model loading/unloading, and `flash-attn` optimizations ensure complex multi-character designs render cleanly without VRAM spikes.
+*   **Speed**: Leverages FP16 and TF32 optimizations for maximum throughput on T4/A100 GPUs.
 
 ## Models
 *   **Synthesis**: Qwen3-TTS-12Hz-1.7B (Base, Custom, Design)
