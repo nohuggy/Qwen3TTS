@@ -52,11 +52,11 @@ custom_css = """
 }
 """
 
-def package_output(text, audio_path, srt_content):
-    """Package audio and optionally SRT into a ZIP, or return raw audio if no SRT"""
+def package_output(text, audio_path, srt_content, qwen3tts_path=None):
+    """Package audio and optionally SRT into a ZIP, or return raw audio if no SRT/qwen3tts"""
     if not audio_path: return None
-    if not srt_content:
-        return audio_path # Return raw WAV if no subtitles
+    if not srt_content and not qwen3tts_path:
+        return audio_path # Return raw WAV if no subtitles and no qwen3tts
         
     import zipfile
     from omnivoice.omni_engine_colab import get_slug
@@ -66,13 +66,16 @@ def package_output(text, audio_path, srt_content):
     with zipfile.ZipFile(zip_path, 'w') as zipf:
         zipf.write(audio_path, f"{slug}.wav")
         base = os.path.splitext(audio_path)[0]
-        srt_path = f"{base}.srt"
-        with open(srt_path, 'w', encoding='utf-8') as f:
-            f.write(srt_content)
-        zipf.write(srt_path, f"{slug}.srt")
+        if srt_content:
+            srt_path = f"{base}.srt"
+            with open(srt_path, 'w', encoding='utf-8') as f:
+                f.write(srt_content)
+            zipf.write(srt_path, f"{slug}.srt")
+        if qwen3tts_path and os.path.exists(qwen3tts_path):
+            zipf.write(qwen3tts_path, f"{slug}.qwen3tts")
     return zip_path
 
-def _adv_accordion(srt_val=True, punc_val=True):
+def _adv_accordion(srt_val=True, punc_val=True, voice_design_mode=False):
     """Returns (temperature, top_p, top_k, repetition_penalty, seed, random_seed, gen_srt, conv_punc)
     inside a collapsed Advanced TTS Settings accordion. Reused across tabs."""
     with gr.Accordion("Advanced TTS Settings", open=False):
@@ -88,6 +91,10 @@ def _adv_accordion(srt_val=True, punc_val=True):
         with gr.Row():
             gen_srt = gr.Checkbox(label="Generate Subtitles", value=srt_val)
             conv_punc = gr.Checkbox(label="Smart Punctuation", value=punc_val)
+            if voice_design_mode:
+                gen_qwen3tts = gr.Checkbox(label="Generate qwen3tts", value=True)
+    if voice_design_mode:
+        return temperature, top_p, top_k, repetition_penalty, seed, random_seed, gen_srt, conv_punc, gen_qwen3tts
     return temperature, top_p, top_k, repetition_penalty, seed, random_seed, gen_srt, conv_punc
 
 def create_app():
@@ -358,7 +365,7 @@ def create_app():
                         label="Voice Description",
                         placeholder="e.g. A middle-aged man with a deep, raspy voice and a calm tone.",
                         lines=3)
-                    d_temp, d_top_p, d_top_k, d_rep, d_seed, d_random_seed, d_gen_srt, d_conv_punc = _adv_accordion(srt_val=False, punc_val=False)
+                    d_temp, d_top_p, d_top_k, d_rep, d_seed, d_random_seed, d_gen_srt, d_conv_punc, d_gen_qwen3tts = _adv_accordion(srt_val=False, punc_val=False, voice_design_mode=True)
                     design_btn = gr.Button("Generate Audio", variant="primary", size="lg")
                 with gr.Column():
                     design_audio  = gr.Audio(label="Generated Speech")
@@ -368,7 +375,7 @@ def create_app():
                         design_status = gr.Textbox(label="Status", interactive=False, lines=2)
                     design_zip    = gr.DownloadButton("Download", visible=False)
 
-            def on_design(text, desc, temperature, top_p, top_k, repetition_penalty, seed, random_seed, gen_srt, conv_punc):
+            def on_design(text, desc, temperature, top_p, top_k, repetition_penalty, seed, random_seed, gen_srt, conv_punc, gen_qwen3tts):
                 start_time = time.time()
                 import random
                 used_seed = int(seed)
@@ -410,10 +417,18 @@ def create_app():
                                 srt = status
                     
                     asr_dur = time.time() - asr_start
+                    
+                    qwen3tts_path = None
+                    if gen_qwen3tts:
+                        yield preview_path, gr.update(), gr.update(visible=False), "✅ Subtitles ready. Compiling .qwen3tts voice...", used_seed
+                        from omnivoice.omni_engine_colab import get_slug
+                        slug = get_slug(text)
+                        qwen3tts_path, _ = compile_role(audio_path, text, slug)
+                    
                     total_dur = time.time() - start_time
                     perf_msg = f"✅ Done! Total: {total_dur:.1f}s | Gen: {tts_dur:.1f}s | Asr: {asr_dur:.1f}s | Words: {count_words(text)} | Seed: {used_seed}"
                     print(f"UI Final: {perf_msg}")
-                    yield preview_path, srt, gr.update(value=package_output(text, audio_path, srt), visible=True), perf_msg, used_seed
+                    yield preview_path, srt, gr.update(value=package_output(text, audio_path, srt, qwen3tts_path), visible=True), perf_msg, used_seed
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
@@ -422,7 +437,7 @@ def create_app():
             design_btn.click(
                 on_design,
                 inputs=[design_text, design_desc,
-                        d_temp, d_top_p, d_top_k, d_rep, d_seed, d_random_seed, d_gen_srt, d_conv_punc],
+                        d_temp, d_top_p, d_top_k, d_rep, d_seed, d_random_seed, d_gen_srt, d_conv_punc, d_gen_qwen3tts],
                 outputs=[design_audio, design_srt, design_zip, design_status, d_seed]
             )
             d_gen_srt.change(lambda x: gr.update(visible=x), inputs=[d_gen_srt], outputs=[design_srt_group])
