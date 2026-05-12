@@ -429,6 +429,37 @@ def compile_role(audio_path, transcript, role_name, status_callback=None):
         import traceback
         traceback.print_exc()
         return None, f"❌ Compilation failed: {str(e)}"
+        
+def extract_tags(text):
+    """Helper to extract leading [tag] instructions and separate them from [pause:X] tags.
+    Returns (actual_text, instruction_string).
+    """
+    if not text: return "", "Standard"
+    
+    # Match the block of leading tags (including whitespace)
+    full_match = re.match(r"^(\s*\[[^\]]+\]\s*)+", text)
+    if not full_match:
+        return text, "Standard"
+    
+    tag_block = full_match.group(0)
+    remaining_text = text[len(tag_block):].strip()
+    
+    # Find all tags in the block
+    all_tags = re.findall(r"\[([^\]]+)\]", tag_block)
+    
+    instr_parts = []
+    pause_parts = []
+    
+    for t in all_tags:
+        if t.startswith("pause:"):
+            pause_parts.append(f"[{t}]")
+        else:
+            instr_parts.append(t)
+            
+    instr = ", ".join(t.strip() for t in instr_parts) if instr_parts else "Standard"
+    # Re-construct actual_text by putting pauses back
+    actual_text = " ".join(pause_parts) + (" " if pause_parts else "") + remaining_text
+    return actual_text.strip(), instr
 
 
 def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
@@ -573,7 +604,13 @@ def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
                 msg = f"Generating chunk {i+1}/{len(paragraphs)}..."
                 if status_callback: status_callback(msg)
                 yield msg
-                all_wavs.extend(process_text_part(p, first_prompt, "Standard"))
+                
+                # Extract leading tags (instructions vs pauses)
+                actual_text, instr = extract_tags(p)
+                if instr != "Standard":
+                    print(f"   🎭 Mono | instruct='{instr}'")
+                
+                all_wavs.extend(process_text_part(actual_text, first_prompt, instr))
         else:
             # Multi Mode
             print(f"Mode: Multi-speaker ({len(segments)} segments)")
@@ -582,19 +619,10 @@ def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
                 content = raw_content.strip()
                 prompt = role_prompts.get(name, first_prompt)
                 
-                # Extract ALL leading instruct/emotion tags: [Confident] [Professional] etc.
-                # Collects every consecutive [tag] at the start, joins as comma list for instruct param.
-                leading_tags = re.findall(r"^\s*(?:\[([^\]]+)\]\s*)+", content)
-                if leading_tags:
-                    # Re-parse individually to get each tag separately
-                    all_leading = re.findall(r"\[([^\]]+)\]", re.match(r"^(\s*\[[^\]]+\]\s*)+", content).group(0))
-                    instr = ", ".join(tag.strip() for tag in all_leading)
-                    # Strip all leading [tag] blocks from spoken text
-                    actual_text = re.sub(r"^(\s*\[[^\]]+\]\s*)+", "", content).strip()
+                # Extract instructions vs pauses
+                actual_text, instr = extract_tags(content)
+                if instr != "Standard":
                     print(f"   🎭 Speaker '{name}' | instruct='{instr}'")
-                else:
-                    instr = "Standard"
-                    actual_text = content
                 
                 msg = f"Generating chunk {i+1}/{len(segments)}..."
                 if status_callback: status_callback(msg)
