@@ -204,8 +204,8 @@ def smart_balanced_split(text, target_words=14, max_words=22):
     
     for p_text in paragraphs:
         p_text = re.sub(r'\s+', ' ', p_text).strip()
-        # Pattern captures tokens with surrounding punctuation
-        pattern = re.compile(r'([^\w\s\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]*)([\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]|[a-zA-Z0-9-]+)([^\w\s\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af\(\[\{\u300c\u300e\u300a\u3008\u201c\u2018\uFF08]*)(\s*)')
+        # Pattern captures tokens with surrounding punctuation - expanded for Latin accents
+        pattern = re.compile(r'([^\w\s\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af\u00C0-\u017F]*)([\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af\u00C0-\u017F]|[a-zA-Z0-9-]+)([^\w\s\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af\u00C0-\u017F\(\[\{\u300c\u300e\u300a\u3008\u201c\u2018\uFF08]*)(\s*)')
         tokens = []
         for match in pattern.finditer(p_text):
             lead_punct, word, trail_punct, space = match.groups()
@@ -214,7 +214,11 @@ def smart_balanced_split(text, target_words=14, max_words=22):
         if not tokens: continue
 
         def split_recursive(tkns):
-            if len(tkns) <= max_words:
+            # Reduced thresholds for more frequent splitting as requested
+            target_words = 12
+            max_words = 18
+            
+            if len(tkns) <= target_words:
                 return ["".join(tkns).strip()]
             n = max(2, round(len(tkns) / target_words))
             avg = len(tkns) / n
@@ -457,8 +461,8 @@ def extract_tags(text):
             instr_parts.append(t)
             
     instr = ", ".join(t.strip() for t in instr_parts) if instr_parts else "Standard"
-    # Re-construct actual_text by putting pauses back
-    actual_text = " ".join(pause_parts) + (" " if pause_parts else "") + remaining_text
+    # Re-construct actual_text by putting pauses back - ensure clean joining
+    actual_text = " ".join(pause_parts + [remaining_text])
     return actual_text.strip(), instr
 
 
