@@ -483,6 +483,10 @@ def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
                 if status_callback: status_callback(msg)
                 yield msg
                 prompt = load_qwen3tts(qwen3tts_path)
+                if prompt:
+                    msg = f"✅ Loaded .qwen3tts: {os.path.basename(qwen3tts_path)}"
+                    if status_callback: status_callback(msg)
+                    yield msg
                 if prompt is None:
                     msg = f"⚠️ Could not load '{qwen3tts_path}', falling back to reference audio..."
                     if status_callback: status_callback(msg)
@@ -564,7 +568,12 @@ def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
         if not segments:
             # Mono Mode
             print("Mode: Mono-character")
-            all_wavs.extend(process_text_part(text, first_prompt, "Standard"))
+            paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
+            for i, p in enumerate(paragraphs):
+                msg = f"Generating chunk {i+1}/{len(paragraphs)}..."
+                if status_callback: status_callback(msg)
+                yield msg
+                all_wavs.extend(process_text_part(p, first_prompt, "Standard"))
         else:
             # Multi Mode
             print(f"Mode: Multi-speaker ({len(segments)} segments)")
