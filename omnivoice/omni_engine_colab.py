@@ -572,21 +572,26 @@ def voice_clone(text, role_bank_data, gen_srt=False, convert_punc=False,
                     if sub.strip():
                         instr_arg = current_instruction if current_instruction != "Standard" else None
                         # Build kwargs; try advanced params first, fall back gracefully
+                        # Force expressiveness by prepending instruction to text and increasing subtalker temp
+                        gen_text = sub.strip()
+                        if instr_arg and instr_arg != "Standard":
+                            gen_text = f"[{instr_arg}] {gen_text}"
+
                         try:
                             w, _ = model.generate_voice_clone(
-                                text=sub.strip(),
+                                text=gen_text,
                                 voice_clone_prompt=current_prompt,
                                 instruct=instr_arg,
                                 temperature=temperature,
                                 top_p=top_p,
                                 top_k=top_k,
                                 repetition_penalty=repetition_penalty,
-                                subtalker_temperature=0.8, # Internal default
+                                subtalker_temperature=1.0, # Increased for better expression
                             )
                         except TypeError:
                             # Older qwen_tts without advanced params — fall back silently
                             w, _ = model.generate_voice_clone(
-                                text=sub.strip(),
+                                text=gen_text,
                                 voice_clone_prompt=current_prompt,
                                 instruct=instr_arg,
                             )
